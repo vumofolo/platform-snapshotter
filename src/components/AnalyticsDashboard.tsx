@@ -671,14 +671,6 @@ export default function AnalyticsDashboard() {
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-analytics-primary">Insight → Action (Julian Cole)</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Make the <span className="font-semibold text-foreground">next best step obvious</span>. Package modules into <span className="font-semibold text-foreground">3 named pathways</span> and signpost them across UX + emails.
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardHeader>
               <CardTitle className="text-analytics-primary">Insight → Action (Rory Sutherland)</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
