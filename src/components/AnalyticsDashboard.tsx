@@ -679,14 +679,6 @@ export default function AnalyticsDashboard() {
           </Card>
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-analytics-primary">Insight → Action (System1 / Jon Evans)</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Maintain a <span className="font-semibold text-foreground">fluent progress device</span> (the ring) everywhere, celebrate <span className="font-semibold text-foreground">small wins</span>, keep copy simple.
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardHeader>
               <CardTitle className="text-analytics-primary">Insight → Action (Rory Sutherland)</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
