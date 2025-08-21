@@ -61,7 +61,27 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				analytics: {
+					primary: 'hsl(var(--analytics-primary))',
+					secondary: 'hsl(var(--analytics-secondary))',
+					accent: 'hsl(var(--analytics-accent))',
+					support: 'hsl(var(--analytics-support))',
+					highlight: 'hsl(var(--analytics-highlight))',
+					alert: 'hsl(var(--analytics-alert))',
+					bg: 'hsl(var(--analytics-bg))'
 				}
+			},
+			backgroundImage: {
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-analytics': 'var(--gradient-analytics)'
+			},
+			boxShadow: {
+				'elegant': 'var(--shadow-elegant)',
+				'card': 'var(--shadow-card)'
+			},
+			transitionTimingFunction: {
+				'smooth': 'var(--transition-smooth)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
