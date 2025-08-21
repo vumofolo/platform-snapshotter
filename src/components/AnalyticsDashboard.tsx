@@ -667,17 +667,6 @@ export default function AnalyticsDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* Insight Action Cards */}
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-analytics-primary">Insight → Action (Rory Sutherland)</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Use <span className="font-semibold text-foreground">defaults</span> (pathway + weekly schedule), <span className="font-semibold text-foreground">Fresh‑Start prompts</span>, and <span className="font-semibold text-foreground">streak framing</span> to pull usage up.
-            </CardContent>
-          </Card>
-        </div>
       </main>
 
       <footer className="text-xs text-right px-6 py-6 text-muted-foreground">
