@@ -272,13 +272,13 @@ function KPIChip({
     support: "bg-analytics-support",
     highlight: "bg-analytics-highlight"
   };
-  return <div className="flex items-center gap-3 rounded-2xl px-4 py-3 bg-card shadow-card border">
-      <div className={`p-2 rounded-xl text-white ${toneMap[tone]}`}>
-        <Icon size={18} />
+  return <div className="flex items-center gap-2 sm:gap-3 rounded-2xl px-3 sm:px-4 py-3 bg-card shadow-card border min-w-0">
+      <div className={`p-1.5 sm:p-2 rounded-xl text-white ${toneMap[tone]} shrink-0`}>
+        <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
       </div>
-      <div>
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="text-lg font-semibold text-foreground">{value}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-muted-foreground truncate">{label}</div>
+        <div className="text-sm sm:text-lg font-semibold text-foreground truncate">{value}</div>
       </div>
     </div>;
 }
@@ -325,44 +325,47 @@ export default function AnalyticsDashboard() {
   return <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="w-full border-b bg-card">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex items-center gap-3">
-            <img src="/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png" alt="Our Equity Logo" className="w-8 h-8" />
+            <img src="/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png" alt="Our Equity Logo" className="w-6 h-6 sm:w-8 sm:h-8" />
             <div>
-              <div className="text-lg font-semibold text-primary">Our Equity — Platform Snapshot</div>
+              <div className="text-base sm:text-lg font-semibold text-primary">Our Equity — Platform Snapshot</div>
               
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => window.print()}>Export PDF</Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <span className="hidden sm:inline">Export PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </Button>
           </div>
         </div>
       </header>
 
       {/* KPI Section */}
-      <section className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <KPIChip icon={LayoutGrid} label="Modules live" value={kpis.totalModules} tone="primary" />
         <KPIChip icon={TrendingUp} label="Total enrolments" value={kpis.totalEnrolments} tone="secondary" />
         <KPIChip icon={Users} label="Unique fellows" value={kpis.uniqueFellows} tone="support" />
         <KPIChip icon={BarChart3} label="Peak enrolment month" value={kpis.peakMonth} tone="highlight" />
-        <div className="flex items-center gap-3 rounded-2xl px-4 py-3 bg-card shadow-card border">
+        <div className="flex items-center gap-3 rounded-2xl px-3 sm:px-4 py-3 bg-card shadow-card border">
           <ProgressRing value={100} label={`${kpis.totalHours}h`} />
           <div>
             <div className="text-xs text-muted-foreground">Total course hours</div>
-            <div className="text-lg font-semibold text-foreground">{kpis.totalHours}</div>
+            <div className="text-sm sm:text-lg font-semibold text-foreground">{kpis.totalHours}</div>
           </div>
         </div>
       </section>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 sm:pb-12">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-4 grid grid-cols-2 md:grid-cols-5 w-full">
-            <TabsTrigger value="modules">Modules</TabsTrigger>
-            <TabsTrigger value="roles">Roles</TabsTrigger>
-            <TabsTrigger value="enrol">Enrolment</TabsTrigger>
-            <TabsTrigger value="classes">Classes</TabsTrigger>
-            <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          <TabsList className="mb-4 grid grid-cols-2 lg:grid-cols-5 w-full h-auto">
+            <TabsTrigger value="modules" className="text-xs sm:text-sm px-2 sm:px-4">Modules</TabsTrigger>
+            <TabsTrigger value="roles" className="text-xs sm:text-sm px-2 sm:px-4">Roles</TabsTrigger>
+            <TabsTrigger value="enrol" className="text-xs sm:text-sm px-2 sm:px-4">Enrolment</TabsTrigger>
+            <TabsTrigger value="classes" className="text-xs sm:text-sm px-2 sm:px-4">Classes</TabsTrigger>
+            <TabsTrigger value="engagement" className="text-xs sm:text-sm px-2 sm:px-4">Engagement</TabsTrigger>
           </TabsList>
 
           {/* Modules Tab */}
@@ -372,23 +375,29 @@ export default function AnalyticsDashboard() {
                 <CardTitle>Modules — Sales by Module</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
+                <div className="h-60 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={modules.map(m => ({
                     name: m.moduleNumber,
                     sales: m.sales
                   }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="name" label={{
-                      value: "Module #",
-                      position: "insideBottom",
-                      offset: -5
-                    }} tick={{
-                      fill: "hsl(var(--muted-foreground))"
-                    }} />
+                      <XAxis 
+                        dataKey="name" 
+                        label={{
+                          value: "Module #",
+                          position: "insideBottom",
+                          offset: -5
+                        }} 
+                        tick={{
+                          fill: "hsl(var(--muted-foreground))",
+                          fontSize: 12
+                        }} 
+                      />
                       <YAxis tick={{
-                      fill: "hsl(var(--muted-foreground))"
-                    }} />
+                        fill: "hsl(var(--muted-foreground))",
+                        fontSize: 12
+                      }} />
                       <Tooltip />
                       <Bar dataKey="sales" fill="hsl(var(--analytics-secondary))" />
                     </BarChart>
