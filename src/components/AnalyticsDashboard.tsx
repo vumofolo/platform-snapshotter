@@ -201,7 +201,7 @@ export default function AnalyticsDashboard() {
       <header className="w-full border-b bg-card">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-primary"></div>
+            <img src="/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png" alt="Our Equity Logo" className="w-8 h-8" />
             <div>
               <div className="text-lg font-semibold text-primary">Our Equity — Platform Snapshot</div>
               <div className="text-xs text-muted-foreground">Walter's 5‑page → interactive site • Brand applied</div>
