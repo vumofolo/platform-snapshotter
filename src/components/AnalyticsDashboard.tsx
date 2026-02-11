@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer } from "lucide-react";
+import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2 } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -344,6 +346,8 @@ function ProgressRing({ size = 60, stroke = 8, value = 100, label = "" }: Progre
 
 export default function AnalyticsDashboard() {
   const [tab, setTab] = useState("modules");
+  const [exporting, setExporting] = useState(false);
+  const dashboardRef = useRef<HTMLDivElement>(null);
   const kpis = useMemo(() => {
     const totalModules = modules.filter(m => m.status === "active").length;
     const totalHours = 29.57;
@@ -361,7 +365,57 @@ export default function AnalyticsDashboard() {
       registrations: m.sales,
     })), []);
 
-  return <div className="min-h-screen bg-background">
+  const allTabs = ["modules", "rankings", "roles", "enrol", "classes", "sessions", "engagement"];
+
+  const exportPDF = useCallback(async () => {
+    if (!dashboardRef.current || exporting) return;
+    setExporting(true);
+    const originalTab = tab;
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+
+    try {
+      for (let i = 0; i < allTabs.length; i++) {
+        setTab(allTabs[i]);
+        // Wait for re-render and charts to settle
+        await new Promise(r => setTimeout(r, 800));
+
+        const canvas = await html2canvas(dashboardRef.current, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          windowWidth: 1280,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+
+        // If content is taller than one page, split across pages
+        let yOffset = 0;
+        const maxContentHeight = pageHeight - margin * 2;
+        while (yOffset < imgHeight) {
+          if (yOffset > 0) pdf.addPage();
+          pdf.addImage(imgData, "PNG", margin, margin - yOffset, imgWidth, imgHeight);
+          yOffset += maxContentHeight;
+        }
+      }
+
+      pdf.save("OurEquity_Dashboard_Report.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setTab(originalTab);
+      setExporting(false);
+    }
+  }, [tab, exporting]);
+
+  return <div ref={dashboardRef} className="min-h-screen bg-background">
     {/* Header */}
     <header className="w-full border-b bg-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
@@ -372,9 +426,8 @@ export default function AnalyticsDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <span className="hidden sm:inline">Export PDF</span>
-            <span className="sm:hidden">PDF</span>
+          <Button variant="outline" size="sm" onClick={exportPDF} disabled={exporting}>
+            {exporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</> : <><span className="hidden sm:inline">Export PDF</span><span className="sm:hidden">PDF</span></>}
           </Button>
         </div>
       </div>
