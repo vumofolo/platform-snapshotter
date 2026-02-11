@@ -1,31 +1,31 @@
 import React, { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe } from "lucide-react";
+import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
 // Data for the analytics dashboard
 const modules = [{
-  id: 2023, moduleNumber: 1, title: "Module 1 - Fellowship Welcome by Dr. T", sales: 10, created: "2024-07-24 20:34", status: "Published"
+  id: 2023, moduleNumber: 1, title: "Module 1 - Fellowship Welcome by Dr. T", sales: 10, created: "2024-07-24 20:34", status: "active"
 }, {
-  id: 2027, moduleNumber: 2, title: "Module 2 - Racism And The Right To Health", sales: 15, created: "2025-02-04 13:27", status: "Published"
+  id: 2027, moduleNumber: 2, title: "Module 2 - Racism And The Right To Health", sales: 15, created: "2025-02-04 13:27", status: "active"
 }, {
-  id: 2028, moduleNumber: 3, title: "Module 3 - Sexual And Reproductive Health Rights", sales: 13, created: "2025-02-04 13:32", status: "Published"
+  id: 2028, moduleNumber: 3, title: "Module 3 - Sexual And Reproductive Health Rights", sales: 13, created: "2025-02-04 13:32", status: "active"
 }, {
-  id: 2029, moduleNumber: 4, title: "Module 4 - Abortion Care – Legal Frameworks, Research, Clinical Care", sales: 11, created: "2025-02-04 13:34", status: "Published"
+  id: 2029, moduleNumber: 4, title: "Module 4 - Abortion Care – Legal Frameworks, Research, Clinical Care", sales: 11, created: "2025-02-04 13:34", status: "active"
 }, {
-  id: 2030, moduleNumber: 5, title: "Module 5 - Group Module - Check-ins", sales: 9, created: "2025-02-04 13:36", status: "Published"
+  id: 2030, moduleNumber: 5, title: "Module 5 - Group Module - Check-ins", sales: 9, created: "2025-02-04 13:36", status: "active"
 }, {
-  id: 2031, moduleNumber: 6, title: "Module 6 - Harm Reduction and the Right to Health", sales: 7, created: "2025-02-04 13:38", status: "Published"
+  id: 2031, moduleNumber: 6, title: "Module 6 - Harm Reduction and the Right to Health", sales: 7, created: "2025-02-04 13:38", status: "active"
 }, {
-  id: 2032, moduleNumber: 7, title: "Module 7 - Decriminalization of Autonomy: Sex workers rights", sales: 6, created: "2025-02-04 21:24", status: "Published"
+  id: 2032, moduleNumber: 7, title: "Module 7 - Decriminalization of Autonomy: Sex workers rights", sales: 6, created: "2025-02-04 21:24", status: "active"
 }, {
-  id: 2033, moduleNumber: 8, title: "Module 8 - Digital Innovation, Technologies And The Right To Health", sales: 5, created: "2025-02-04 21:45", status: "Published"
+  id: 2033, moduleNumber: 8, title: "Module 8 - Digital Innovation, Technologies And The Right To Health", sales: 5, created: "2025-02-04 21:45", status: "active"
 }, {
-  id: 2034, moduleNumber: 9, title: "Module 9 - Group Module: Media as Advocacy Tool", sales: 4, created: "2025-02-04 22:01", status: "Published"
+  id: 2034, moduleNumber: 9, title: "Module 9 - Group Module: Media as Advocacy Tool", sales: 4, created: "2025-02-04 22:01", status: "active"
 }, {
-  id: 2035, moduleNumber: 10, title: "Module 10 - Pleasure as Revolution: Conclusion", sales: 4, created: "2025-02-04 22:14", status: "Published"
+  id: 2035, moduleNumber: 10, title: "Module 10 - Pleasure as Revolution: Conclusion", sales: 4, created: "2025-02-04 22:14", status: "active"
 }];
 
 const roles = [
@@ -127,7 +127,35 @@ const classesPerFellow = [
   { name: "inijims2003", classes: 0 },
 ];
 
-// Session data: fellows by country
+// Fellow statuses from Page 2
+const fellowStatuses = [
+  { name: "inijims2003", status: "pending" },
+  { name: "Mr Fellow", status: "active" },
+  { name: "Carries Shelver", status: "active" },
+  { name: "Matshidiso Masire", status: "active" },
+  { name: "Dr Gcobani Qambela", status: "active" },
+  { name: "Biruk Tewodros", status: "active" },
+  { name: "Saida Dahir", status: "active" },
+  { name: "Colleen Cane", status: "active" },
+  { name: "Gumani Tshimomola", status: "active" },
+  { name: "Catherine Burns", status: "active" },
+  { name: "Lebohang Tshimomola", status: "active" },
+  { name: "Lesego Tlhwale", status: "active" },
+  { name: "Dudu Dlamini", status: "active" },
+  { name: "Esihle Lupindo", status: "active" },
+  { name: "Zenande Booi, New York", status: "active" },
+  { name: "Naomi Tuley-Solanke", status: "active" },
+  { name: "Kgomotso Mashigo", status: "active" },
+  { name: "Nomtika Mjwana", status: "active" },
+  { name: "Janice Joseph", status: "active" },
+  { name: "Kerigo Odada", status: "active" },
+  { name: "dqdqdq", status: "active" },
+  { name: "Letlhogonolo Mokgoroane", status: "active" },
+  { name: "Dr Tlaleng", status: "active" },
+  { name: "nastar", status: "active" },
+];
+
+// Session data: fellows by country and city
 const sessionsByCountry = [
   { country: "South Africa", sessions: 38, fellows: 9 },
   { country: "United States", sessions: 10, fellows: 5 },
@@ -135,6 +163,28 @@ const sessionsByCountry = [
   { country: "Indonesia", sessions: 3, fellows: 2 },
   { country: "Kenya", sessions: 1, fellows: 1 },
   { country: "Tanzania", sessions: 1, fellows: 1 },
+];
+
+const sessionsByCity = [
+  { city: "Pretoria", country: "South Africa", sessions: 22 },
+  { city: "Johannesburg", country: "South Africa", sessions: 7 },
+  { city: "Silver Spring", country: "United States", sessions: 4 },
+  { city: "Cape Town", country: "South Africa", sessions: 4 },
+  { city: "New York", country: "United States", sessions: 2 },
+  { city: "Brooklyn", country: "United States", sessions: 2 },
+  { city: "Lausanne", country: "Switzerland", sessions: 2 },
+  { city: "Centurion", country: "South Africa", sessions: 2 },
+  { city: "Boshof", country: "South Africa", sessions: 2 },
+  { city: "Melkbosstrand", country: "South Africa", sessions: 2 },
+  { city: "Lincoln", country: "United States", sessions: 2 },
+  { city: "Depok", country: "Indonesia", sessions: 2 },
+  { city: "Wetzikon", country: "Switzerland", sessions: 1 },
+  { city: "Geneva", country: "Switzerland", sessions: 1 },
+  { city: "Nairobi", country: "Kenya", sessions: 1 },
+  { city: "Arlington", country: "United States", sessions: 1 },
+  { city: "Kempton Park", country: "South Africa", sessions: 1 },
+  { city: "Kijini", country: "Tanzania", sessions: 1 },
+  { city: "Bogor", country: "Indonesia", sessions: 1 },
 ];
 
 // Session data: fellows by device
@@ -151,12 +201,51 @@ const sessionsByOS = [
   { os: "Android", sessions: 2 },
 ];
 
+// Sessions per month
+const sessionsPerMonth = [
+  { month: "2024-09", sessions: 2 },
+  { month: "2025-02", sessions: 14 },
+  { month: "2025-05", sessions: 24 },
+  { month: "2025-06", sessions: 5 },
+  { month: "2025-07", sessions: 4 },
+  { month: "2025-08", sessions: 2 },
+  { month: "2025-09", sessions: 1 },
+  { month: "2025-10", sessions: 3 },
+  { month: "2025-11", sessions: 1 },
+  { month: "2025-12", sessions: 4 },
+  { month: "2026-02", sessions: 1 },
+];
+
 // Session time-of-day (login times)
 const sessionsByTimeOfDay = [
   { slot: "00:00–05:59", label: "Late Night", count: 2 },
   { slot: "06:00–11:59", label: "Morning", count: 18 },
   { slot: "12:00–17:59", label: "Afternoon", count: 24 },
   { slot: "18:00–23:59", label: "Evening", count: 14 },
+];
+
+// Duration ranking data (from session Duration column)
+const durationRanking = [
+  { fellow: "Kgomotso Mashigo", duration: "23h 18m", minutes: 1398, tier: "High" },
+  { fellow: "Mr Fellow", duration: "5h 28m", minutes: 328, tier: "High" },
+  { fellow: "Lesego Tlhwale", duration: "7h 50m", minutes: 470, tier: "High" },
+  { fellow: "Janice Joseph", duration: "5h 9m", minutes: 309, tier: "High" },
+  { fellow: "Letlhogonolo Mokgoroane", duration: "37m", minutes: 37, tier: "Medium" },
+  { fellow: "Kgomotso Mashigo (session 2)", duration: "7m", minutes: 7, tier: "Low" },
+  { fellow: "Catherine Burns", duration: "3m", minutes: 3, tier: "Low" },
+  { fellow: "Mr Fellow (quick)", duration: "2m", minutes: 2, tier: "Low" },
+];
+
+// Aggregated duration per fellow
+const durationPerFellow = [
+  { fellow: "Kgomotso Mashigo", totalMinutes: 1439, display: "23h 59m", tier: "High" },
+  { fellow: "Lesego Tlhwale", totalMinutes: 470, display: "7h 50m", tier: "High" },
+  { fellow: "Mr Fellow", totalMinutes: 334, display: "5h 34m", tier: "High" },
+  { fellow: "Janice Joseph", totalMinutes: 309, display: "5h 9m", tier: "Medium" },
+  { fellow: "Letlhogonolo Mokgoroane", totalMinutes: 37, display: "37m", tier: "Medium" },
+  { fellow: "Carries Shelver", totalMinutes: 0, display: "—", tier: "Low" },
+  { fellow: "Catherine Burns", totalMinutes: 3, display: "3m", tier: "Low" },
+  { fellow: "Dudu Dlamini", totalMinutes: 0, display: "—", tier: "Low" },
 ];
 
 // Fellow activity with location & time context
@@ -256,12 +345,13 @@ function ProgressRing({ size = 60, stroke = 8, value = 100, label = "" }: Progre
 export default function AnalyticsDashboard() {
   const [tab, setTab] = useState("modules");
   const kpis = useMemo(() => {
-    const totalModules = modules.length;
+    const totalModules = modules.filter(m => m.status === "active").length;
     const totalHours = 29.57;
     const totalEnrolments = modules.reduce((a, m) => a + (m.sales || 0), 0);
     const uniqueFellows = new Set(modulesPerFellow.map(m => m.fellow)).size;
+    const activeFellows = fellowStatuses.filter(f => f.status === "active").length;
     const peakMonth = enrollmentsByMonth.slice().sort((a, b) => b.uniqueFellows - a.uniqueFellows)[0]?.month || "—";
-    return { totalModules, totalHours, totalEnrolments, uniqueFellows, peakMonth };
+    return { totalModules, totalHours, totalEnrolments, uniqueFellows, activeFellows, peakMonth };
   }, []);
 
   const moduleRankings = useMemo(() =>
@@ -291,10 +381,11 @@ export default function AnalyticsDashboard() {
     </header>
 
     {/* KPI Section */}
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-      <KPIChip icon={LayoutGrid} label="Modules live" value={kpis.totalModules} tone="primary" />
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+      <KPIChip icon={LayoutGrid} label="Active modules" value={kpis.totalModules} tone="primary" />
       <KPIChip icon={TrendingUp} label="Total enrolments" value={kpis.totalEnrolments} tone="secondary" />
-      <KPIChip icon={Users} label="Unique fellows" value={kpis.uniqueFellows} tone="support" />
+      <KPIChip icon={Users} label="Active fellows" value={kpis.activeFellows} tone="support" />
+      <KPIChip icon={Users} label="Unique fellows enrolled" value={kpis.uniqueFellows} tone="primary" />
       <KPIChip icon={BarChart3} label="Peak enrolment month" value={kpis.peakMonth} tone="highlight" />
       <div className="flex items-center gap-3 rounded-2xl px-3 sm:px-4 py-3 bg-card shadow-card border">
         <ProgressRing value={100} label={`${kpis.totalHours}h`} />
@@ -322,7 +413,7 @@ export default function AnalyticsDashboard() {
         <TabsContent value="modules">
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Modules — Registrations by Module</CardTitle>
+              <CardTitle>Modules — Registrations by Module (Volume by Sales Count)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-60 sm:h-80">
@@ -353,7 +444,7 @@ export default function AnalyticsDashboard() {
                     <tr className="text-left border-b">
                       <th className="py-2 pr-4 font-semibold">Module #</th>
                       <th className="py-2 pr-4 font-semibold">Title</th>
-                      <th className="py-2 pr-4 font-semibold">Registrations</th>
+                      <th className="py-2 pr-4 font-semibold">Sales Count</th>
                       <th className="py-2 pr-4 font-semibold">Created</th>
                       <th className="py-2 pr-4 font-semibold">Status</th>
                     </tr>
@@ -365,7 +456,7 @@ export default function AnalyticsDashboard() {
                       <td className="py-2 pr-4 font-medium">{m.sales}</td>
                       <td className="py-2 pr-4 text-muted-foreground">{m.created}</td>
                       <td className="py-2 pr-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-analytics-support text-analytics-support-foreground">{m.status}</span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-analytics-support text-analytics-support-foreground capitalize">{m.status}</span>
                       </td>
                     </tr>)}
                   </tbody>
@@ -559,7 +650,7 @@ export default function AnalyticsDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Modules Enrolled per Fellow</CardTitle>
+              <CardTitle>Modules Enrolled per Fellow (Ranked)</CardTitle>
               <Button size="sm" onClick={() => downloadCSV("modules_per_fellow.csv", modulesPerFellow)}>
                 <Download className="mr-2 h-4 w-4" /> CSV
               </Button>
@@ -569,12 +660,14 @@ export default function AnalyticsDashboard() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left border-b">
+                      <th className="py-2 pr-4 font-semibold">Rank</th>
                       <th className="py-2 pr-4 font-semibold">Fellow</th>
                       <th className="py-2 pr-4 font-semibold">Modules Enrolled</th>
                     </tr>
                   </thead>
                   <tbody>
                     {modulesPerFellow.map((r, idx) => <tr key={idx} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                      <td className="py-2 pr-4 font-medium">#{idx + 1}</td>
                       <td className="py-2 pr-4">{r.fellow}</td>
                       <td className="py-2 pr-4 font-medium">{r.modulesEnrolled}</td>
                     </tr>)}
@@ -587,6 +680,12 @@ export default function AnalyticsDashboard() {
 
         {/* Classes Tab */}
         <TabsContent value="classes">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <KPIChip icon={Users} label="Active fellows" value={kpis.activeFellows} tone="support" />
+            <KPIChip icon={BarChart3} label="Fellows with classes" value={classesPerFellow.filter(f => f.classes > 0).length} tone="secondary" />
+            <KPIChip icon={TrendingUp} label="Avg classes/fellow" value={(classesPerFellow.reduce((a, f) => a + f.classes, 0) / classesPerFellow.filter(f => f.classes > 0).length).toFixed(1)} tone="highlight" />
+          </div>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Top Fellows by Classes Taken</CardTitle>
@@ -608,7 +707,7 @@ export default function AnalyticsDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Classes per Fellow (Full table)</CardTitle>
+              <CardTitle>Classes per Fellow — Ranked Top to Least Enrolled</CardTitle>
               <Button size="sm" onClick={() => downloadCSV("classes_per_fellow.csv", classesPerFellow)}>
                 <Download className="mr-2 h-4 w-4" /> CSV
               </Button>
@@ -618,12 +717,14 @@ export default function AnalyticsDashboard() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left border-b">
+                      <th className="py-2 pr-4 font-semibold">Rank</th>
                       <th className="py-2 pr-4 font-semibold">Name</th>
-                      <th className="py-2 pr-4 font-semibold">Classes Taken</th>
+                      <th className="py-2 pr-4 font-semibold">Classes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {classesPerFellow.map((r, idx) => <tr key={idx} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                    {[...classesPerFellow].sort((a, b) => b.classes - a.classes).map((r, idx) => <tr key={idx} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                      <td className="py-2 pr-4 font-medium">#{idx + 1}</td>
                       <td className="py-2 pr-4">{r.name}</td>
                       <td className="py-2 pr-4 font-medium">{r.classes}</td>
                     </tr>)}
@@ -639,7 +740,7 @@ export default function AnalyticsDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Globe size={16} /> Sessions by Country</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Globe size={16} /> Fellows by Country</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -649,31 +750,37 @@ export default function AnalyticsDashboard() {
                       <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                       <YAxis dataKey="country" type="category" width={90} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="sessions" fill="hsl(var(--analytics-primary))" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="sessions" fill="hsl(var(--analytics-primary))" radius={[0, 6, 6, 0]} name="Sessions" />
+                      <Bar dataKey="fellows" fill="hsl(var(--analytics-accent))" radius={[0, 6, 6, 0]} name="Fellows" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2"><strong>South Africa</strong> dominates with 38 sessions (9 fellows), followed by the <strong>United States</strong> with 10 sessions (5 fellows).</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Clock size={16} /> Session Login Times</CardTitle>
+                <CardTitle className="flex items-center gap-2"><MapPin size={16} /> Fellows by City</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={sessionsByTimeOfDay}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="hsl(var(--analytics-accent))" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="h-64 overflow-y-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left border-b">
+                        <th className="py-1.5 pr-3 font-semibold">City</th>
+                        <th className="py-1.5 pr-3 font-semibold">Country</th>
+                        <th className="py-1.5 font-semibold">Sessions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sessionsByCity.map((c, idx) => <tr key={idx} className="border-b last:border-0">
+                        <td className="py-1.5 pr-3">{c.city}</td>
+                        <td className="py-1.5 pr-3 text-muted-foreground">{c.country}</td>
+                        <td className="py-1.5 font-medium">{c.sessions}</td>
+                      </tr>)}
+                    </tbody>
+                  </table>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Fellows log in mostly during <strong>afternoons</strong> (24 sessions) and <strong>mornings</strong> (18 sessions).</p>
               </CardContent>
             </Card>
           </div>
@@ -716,6 +823,87 @@ export default function AnalyticsDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Clock size={16} /> Sessions per Month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sessionsPerMonth}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} angle={-30} textAnchor="end" height={60} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                      <Tooltip />
+                      <Bar dataKey="sessions" fill="hsl(var(--analytics-support))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">May 2025 had the highest session activity with 24 sessions.</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Clock size={16} /> Session Login Times</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sessionsByTimeOfDay}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="hsl(var(--analytics-accent))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Fellows log in mostly during <strong>afternoons</strong> (24 sessions) and <strong>mornings</strong> (18 sessions).</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Duration Ranking */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Timer size={16} /> Session Duration Ranking</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="rounded-xl border p-4 bg-analytics-support/10">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">🔥 High Duration</div>
+                  {durationPerFellow.filter(f => f.tier === "High").map((f, idx) => (
+                    <div key={idx} className="flex justify-between py-1 text-sm">
+                      <span>{f.fellow}</span>
+                      <span className="font-semibold">{f.display}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-xl border p-4 bg-analytics-highlight/10">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">⚡ Medium Duration</div>
+                  {durationPerFellow.filter(f => f.tier === "Medium").map((f, idx) => (
+                    <div key={idx} className="flex justify-between py-1 text-sm">
+                      <span>{f.fellow}</span>
+                      <span className="font-semibold">{f.display}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-xl border p-4 bg-analytics-alert/10">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2">📉 Low / No Duration</div>
+                  {durationPerFellow.filter(f => f.tier === "Low").map((f, idx) => (
+                    <div key={idx} className="flex justify-between py-1 text-sm">
+                      <span>{f.fellow}</span>
+                      <span className="font-semibold">{f.display}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">💡 Duration data from session start/end times. <strong>Kgomotso Mashigo</strong> has the longest total session time (~24h), while several fellows have no recorded duration.</p>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
