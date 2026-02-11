@@ -17,63 +17,63 @@ const modules = [{
   id: 2027,
   moduleNumber: 2,
   title: "Module 2 - Racism And The Right To Health",
-  sales: 13,
+  sales: 15,
   created: "2025-02-04 13:27",
   status: "Published"
 }, {
   id: 2028,
   moduleNumber: 3,
   title: "Module 3 - Sexual And Reproductive Health Rights: Challenges And Opportunities During The COVID-19 Pandemic",
-  sales: 9,
+  sales: 13,
   created: "2025-02-04 13:32",
   status: "Published"
 }, {
   id: 2029,
   moduleNumber: 4,
   title: "Module 4 - Abortion Care – Legal Frameworks, Research, Clinical Care, Commodities, and Dignified Care",
-  sales: 8,
+  sales: 11,
   created: "2025-02-04 13:34",
   status: "Published"
 }, {
   id: 2030,
   moduleNumber: 5,
   title: "Module 5 - Group Module - Check-ins",
-  sales: 6,
+  sales: 9,
   created: "2025-02-04 13:36",
   status: "Published"
 }, {
   id: 2031,
   moduleNumber: 6,
   title: "Module 6 - Harm Reduction and the Right to Health – Stigmatized, Criminalized, Marginalized",
-  sales: 2,
+  sales: 7,
   created: "2025-02-04 13:38",
   status: "Published"
 }, {
   id: 2032,
   moduleNumber: 7,
   title: "Module 7 - Decriminalization of Autonomy: Sex workers rights",
-  sales: 2,
-  created: "2025-02-04 21:21",
+  sales: 6,
+  created: "2025-02-04 21:24",
   status: "Published"
 }, {
   id: 2033,
   moduleNumber: 8,
   title: "Module 8 - Digital Innovation, Technologies And The Right To Health",
-  sales: 1,
+  sales: 5,
   created: "2025-02-04 21:45",
   status: "Published"
 }, {
   id: 2034,
   moduleNumber: 9,
   title: "Module 9 - Group Module: The Use of Media as an Advocacy Tool for the Right to Health",
-  sales: 1,
+  sales: 4,
   created: "2025-02-04 22:01",
   status: "Published"
 }, {
   id: 2035,
   moduleNumber: 10,
   title: "Module 10 - Pleasure as Revolution: Conclusion, Feedback/Survey, Alumni Sign-up",
-  sales: 1,
+  sales: 4,
   created: "2025-02-04 22:14",
   status: "Published"
 }];
@@ -109,35 +109,56 @@ const enrollmentsByMonth = [{
   uniqueFellows: 6
 }, {
   month: "2025-07",
-  uniqueFellows: 7
+  uniqueFellows: 6
 }, {
   month: "2025-08",
+  uniqueFellows: 1
+}, {
+  month: "2025-09",
+  uniqueFellows: 1
+}, {
+  month: "2025-10",
+  uniqueFellows: 2
+}, {
+  month: "2025-11",
+  uniqueFellows: 3
+}, {
+  month: "2025-12",
+  uniqueFellows: 4
+}, {
+  month: "2026-01",
   uniqueFellows: 1
 }];
 const modulesPerFellow = [{
   fellow: "Letlhogonolo Mokgoroane",
   modulesEnrolled: 10
 }, {
+  fellow: "Janice Joseph",
+  modulesEnrolled: 9
+}, {
+  fellow: "Gumani Tshimomola",
+  modulesEnrolled: 9
+}, {
+  fellow: "Lebohang Tshimomola",
+  modulesEnrolled: 9
+}, {
   fellow: "Lesego Tlhwale",
+  modulesEnrolled: 6
+}, {
+  fellow: "Biruk Tewodros",
   modulesEnrolled: 6
 }, {
   fellow: "Esihle Lupindo",
   modulesEnrolled: 5
 }, {
-  fellow: "Janice Joseph",
-  modulesEnrolled: 4
+  fellow: "Naomi Tuley-Solanke",
+  modulesEnrolled: 5
 }, {
   fellow: "Kerigo Odada",
   modulesEnrolled: 4
 }, {
-  fellow: "Naomi Tuley-Solanke",
-  modulesEnrolled: 4
-}, {
   fellow: "Zenande Booi, New York",
   modulesEnrolled: 4
-}, {
-  fellow: "Gumani Tshimomola",
-  modulesEnrolled: 3
 }, {
   fellow: "Kgomotso Mashigo",
   modulesEnrolled: 3
@@ -145,20 +166,32 @@ const modulesPerFellow = [{
   fellow: "Mr Fellow",
   modulesEnrolled: 3
 }, {
-  fellow: "Biruk Tewodros",
-  modulesEnrolled: 1
+  fellow: "Dr Gcobani Qambela",
+  modulesEnrolled: 3
+}, {
+  fellow: "Carries Shelver",
+  modulesEnrolled: 2
 }, {
   fellow: "Dr Tlaleng",
-  modulesEnrolled: 1
-}, {
-  fellow: "Lebohang Tshimomola",
   modulesEnrolled: 1
 }];
 const classesPerFellow = [{
   name: "Letlhogonolo Mokgoroane",
   classes: 10
 }, {
+  name: "Janice Joseph",
+  classes: 9
+}, {
+  name: "Gumani Tshimomola",
+  classes: 9
+}, {
+  name: "Lebohang Tshimomola",
+  classes: 9
+}, {
   name: "Lesego Tlhwale",
+  classes: 6
+}, {
+  name: "Biruk Tewodros",
   classes: 6
 }, {
   name: "Mr Fellow",
@@ -167,13 +200,10 @@ const classesPerFellow = [{
   name: "Esihle Lupindo",
   classes: 5
 }, {
-  name: "Zenande Booi, New York",
-  classes: 4
-}, {
   name: "Naomi Tuley-Solanke",
-  classes: 4
+  classes: 5
 }, {
-  name: "Janice Joseph",
+  name: "Zenande Booi, New York",
   classes: 4
 }, {
   name: "Kerigo Odada",
@@ -182,31 +212,22 @@ const classesPerFellow = [{
   name: "Kgomotso Mashigo",
   classes: 3
 }, {
-  name: "Gumani Tshimomola",
+  name: "Dr Gcobani Qambela",
   classes: 3
 }, {
-  name: "Lebohang Tshimomola",
-  classes: 1
-}, {
-  name: "Biruk Tewodros",
-  classes: 1
+  name: "Carries Shelver",
+  classes: 2
 }, {
   name: "Dr Tlaleng",
   classes: 1
 }, {
-  name: "Carries Shelver",
+  name: "Colleen Cane",
   classes: 0
 }, {
   name: "Dudu Dlamini",
   classes: 0
 }, {
   name: "Matshidiso Masire",
-  classes: 0
-}, {
-  name: "Dr Gcobani Qambela",
-  classes: 0
-}, {
-  name: "Colleen Cane",
   classes: 0
 }, {
   name: "Nomtika Mjwana",
@@ -222,6 +243,9 @@ const classesPerFellow = [{
   classes: 0
 }, {
   name: "nastar",
+  classes: 0
+}, {
+  name: "inijims2003",
   classes: 0
 }];
 const engagementByMonth = [{
