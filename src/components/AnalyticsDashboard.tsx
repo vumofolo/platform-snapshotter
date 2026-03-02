@@ -371,75 +371,199 @@ export default function AnalyticsDashboard() {
     if (!dashboardRef.current || exporting) return;
     setExporting(true);
     const originalTab = tab;
+
     const pdf = new jsPDF("p", "mm", "a4");
-    const A4_W = pdf.internal.pageSize.getWidth();
-    const A4_H = pdf.internal.pageSize.getHeight();
-    const margin = 10;
+    const A4_W = pdf.internal.pageSize.getWidth();   // ~210
+    const A4_H = pdf.internal.pageSize.getHeight();   // ~297
+    const margin = 12;
     const contentW = A4_W - margin * 2;
-    const gap = 4;
+    const gap = 5;
     let currentY = margin;
-    let isFirstPage = true;
 
-    const addSectionToPDF = (imgData: string, imgWidthPx: number, imgHeightPx: number) => {
-      const scaleFactor = contentW / imgWidthPx;
-      const sectionH = imgHeightPx * scaleFactor;
-
-      // If section won't fit on current page and we're not at the top, start new page
-      if (currentY + sectionH > A4_H - margin && currentY > margin) {
-        pdf.addPage();
-        currentY = margin;
-      } else if (!isFirstPage && currentY === margin) {
-        // Already on a fresh page
-      }
-
-      // If a single section is taller than a full page, scale it down to fit
-      const maxH = A4_H - margin * 2;
-      if (sectionH > maxH) {
-        const fitScale = maxH / sectionH;
-        const fitW = contentW * fitScale;
-        const fitH = sectionH * fitScale;
-        const xOffset = margin + (contentW - fitW) / 2;
-        pdf.addImage(imgData, "PNG", xOffset, currentY, fitW, fitH);
-        currentY += fitH + gap;
-      } else {
-        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
-        currentY += sectionH + gap;
-      }
-      isFirstPage = false;
+    const tabLabels: Record<string, string> = {
+      modules: "Modules Overview",
+      rankings: "Module Rankings & Activity",
+      roles: "Roles & Access",
+      enrol: "Enrolment Analysis",
+      classes: "Classes & Completion",
+      sessions: "Sessions, Location & Devices",
+      engagement: "Engagement & Messaging",
     };
 
+    // ── helpers ──────────────────────────────────────────────
+
+    /** Wait for React to re-render + Recharts to finish animating */
+    const waitForRender = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          // Extra frame for Recharts animation settle
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 800);
+          });
+        });
+      });
+
+    /** Draw a section title bar in the PDF */
+    const drawTabHeader = (label: string) => {
+      if (currentY + 14 > A4_H - margin) {
+        pdf.addPage();
+        currentY = margin;
+      }
+      pdf.setFillColor(30, 41, 59);                   // slate-800
+      pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(label, margin + 4, currentY + 7);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont("helvetica", "normal");
+      currentY += 10 + gap;
+    };
+
+    /** Place an image from html2canvas onto the PDF, handling page overflow */
+    const addImageToPDF = (imgData: string, imgWidthPx: number, imgHeightPx: number) => {
+      const scale = contentW / imgWidthPx;
+      const sectionH = imgHeightPx * scale;
+      const maxPageH = A4_H - margin * 2;
+
+      // Fits remaining space → place it
+      if (currentY + sectionH <= A4_H - margin) {
+        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
+        currentY += sectionH + gap;
+        return;
+      }
+
+      // Doesn't fit but we're not at the top → new page first
+      if (currentY > margin + 1) {
+        pdf.addPage();
+        currentY = margin;
+      }
+
+      // After moving to top, does it fit a full page?
+      if (sectionH <= maxPageH) {
+        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
+        currentY += sectionH + gap;
+        return;
+      }
+
+      // Section taller than a full page → scale width to fit height onto one page
+      // This preserves readability better than clipping
+      const fitScale = maxPageH / sectionH;
+      const fitW = contentW * fitScale;
+      const xOffset = margin + (contentW - fitW) / 2;
+      pdf.addImage(imgData, "PNG", xOffset, currentY, fitW, maxPageH);
+      currentY += maxPageH + gap;
+    };
+
+    // ── cover page ──────────────────────────────────────────
+
+    const drawCoverPage = () => {
+      pdf.setFillColor(15, 23, 42);                    // slate-900
+      pdf.rect(0, 0, A4_W, A4_H, "F");
+
+      // Accent line
+      pdf.setFillColor(99, 102, 241);                  // indigo-500
+      pdf.rect(margin, 100, 60, 3, "F");
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(28);
+      pdf.text("Our Equity", margin, 120);
+
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(203, 213, 225);                  // slate-300
+      pdf.text("Platform Snapshot Report", margin, 132);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(148, 163, 184);                  // slate-400
+      const dateStr = new Date().toLocaleDateString("en-ZA", {
+        year: "numeric", month: "long", day: "numeric",
+      });
+      pdf.text(`Generated: ${dateStr}`, margin, 148);
+      pdf.text("Generated for cohort & sponsors", margin, 156);
+
+      // Reset for content pages
+      pdf.setTextColor(0, 0, 0);
+    };
+
+    // ── main export loop ────────────────────────────────────
+
     try {
+      drawCoverPage();
+
+      // Capture the KPI row (above tabs, always visible)
+      const kpiSection = dashboardRef.current.querySelector("section");
+      if (kpiSection) {
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader("Key Metrics");
+        const kpiCanvas = await html2canvas(kpiSection as HTMLElement, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          windowWidth: 1280,
+        });
+        addImageToPDF(kpiCanvas.toDataURL("image/png"), kpiCanvas.width, kpiCanvas.height);
+      }
+
       for (let i = 0; i < allTabs.length; i++) {
-        setTab(allTabs[i]);
-        await new Promise(r => setTimeout(r, 1000));
+        const tabKey = allTabs[i];
+        setTab(tabKey);
+        await waitForRender();
 
-        // Add a tab title page separator
-        if (i > 0) {
-          pdf.addPage();
-          currentY = margin;
-        }
+        // Start each tab section on a fresh page
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader(tabLabels[tabKey] || tabKey);
 
-        // Find all Card sections within the active tab content
-        const tabContent = dashboardRef.current.querySelector('[role="tabpanel"][data-state="active"]');
+        const tabContent = dashboardRef.current.querySelector(
+          '[role="tabpanel"][data-state="active"]'
+        );
         if (!tabContent) continue;
 
-        const sections = tabContent.querySelectorAll(':scope > div, :scope > .grid, :scope > [class*="Card"], :scope > div > [class*="Card"]');
-        // Collect top-level children as sections
         const topSections = Array.from(tabContent.children) as HTMLElement[];
 
         for (const section of topSections) {
-          if (section.offsetHeight < 10) continue; // skip invisible
+          if (section.offsetHeight < 10) continue;
+
           const canvas = await html2canvas(section, {
             scale: 2,
             useCORS: true,
             logging: false,
             backgroundColor: "#ffffff",
             windowWidth: 1280,
+            onclone: (clonedDoc) => {
+              // Force white background on the cloned element so CSS vars resolve
+              const clonedEl = clonedDoc.body;
+              clonedEl.style.backgroundColor = "#ffffff";
+              clonedEl.style.color = "#0f172a";
+              // Force all Card borders to be visible
+              clonedDoc.querySelectorAll("[class*='Card'], [class*='card']").forEach((el) => {
+                (el as HTMLElement).style.borderColor = "#e2e8f0";
+              });
+            },
           });
           const imgData = canvas.toDataURL("image/png");
-          addSectionToPDF(imgData, canvas.width, canvas.height);
+          addImageToPDF(imgData, canvas.width, canvas.height);
         }
       }
+
+      // ── footer on each page ──
+      const pageCount = pdf.getNumberOfPages();
+      for (let p = 2; p <= pageCount; p++) {
+        pdf.setPage(p);
+        pdf.setFontSize(7);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(
+          `Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`,
+          A4_W / 2,
+          A4_H - 5,
+          { align: "center" }
+        );
+      }
+      pdf.setTextColor(0, 0, 0);
 
       pdf.save("OurEquity_Dashboard_Report.pdf");
     } catch (err) {
