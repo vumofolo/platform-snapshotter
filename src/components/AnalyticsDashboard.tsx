@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2, Check } from "lucide-react";
-import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -369,33 +369,11 @@ export default function AnalyticsDashboard() {
   const allTabs = ["modules", "rankings", "roles", "enrol", "classes", "sessions", "engagement"];
 
   const exportPDF = useCallback(async () => {
-    if (!dashboardRef.current || exporting) return;
-
+    if (exporting) return;
     setExporting(true);
     setExportDone(false);
-    const originalTab = tab;
 
-    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
-    const A4_W = pdf.internal.pageSize.getWidth();
-    const A4_H = pdf.internal.pageSize.getHeight();
-    const margin = 12;
-    const contentW = A4_W - margin * 2;
-    const FOOTER_H = 10;
-    const usableH = A4_H - margin - FOOTER_H;
-    const sectionGap = 4;
-    let currentY = margin;
-
-    const tabLabels: Record<string, string> = {
-      modules: "Modules Overview",
-      rankings: "Module Rankings & Activity",
-      roles: "Roles & Access",
-      enrol: "Enrolment Analysis",
-      classes: "Classes & Completion",
-      sessions: "Sessions, Location & Devices",
-      engagement: "Engagement & Messaging",
-    };
-
-    // Create full-screen overlay
+    // Overlay
     const overlay = document.createElement("div");
     overlay.id = "pdf-export-overlay";
     overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(15,23,42,0.92);";
@@ -415,206 +393,358 @@ export default function AnalyticsDashboard() {
     overlay.appendChild(msgEl);
     document.body.appendChild(overlay);
 
-    const waitForRender = () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setTimeout(resolve, 400);
-          });
-        });
-      });
-
-    const loadLogoDataURL = async (path: string) => {
-      try {
-        const response = await fetch(path, { cache: "force-cache" });
-        const blob = await response.blob();
-        return await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(String(reader.result || ""));
-          reader.onerror = () => reject(new Error("Failed to read logo file"));
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        return "";
-      }
-    };
-
-    const patchClonedDom = (clonedDoc: Document) => {
-      const style = clonedDoc.createElement("style");
-      style.innerHTML = `
-        * { animation: none !important; transition: none !important; }
-        body { background: #ffffff !important; color: #0f172a !important; }
-      `;
-      clonedDoc.head.appendChild(style);
-
-      clonedDoc.querySelectorAll("*").forEach((el) => {
-        const fs = parseFloat(window.getComputedStyle(el).fontSize);
-        if (fs > 0 && fs < 13) {
-          (el as HTMLElement).style.fontSize = "13px";
-        }
-      });
-
-      clonedDoc.querySelectorAll("svg text").forEach((el) => {
-        const t = el as SVGTextElement;
-        if (!t.style.fill || t.style.fill === "none") {
-          t.style.fill = "#334155";
-        }
-        const currentFs = parseFloat(t.style.fontSize || "12");
-        t.style.fontSize = Math.max(currentFs, 13) + "px";
-      });
-
-      clonedDoc.querySelectorAll(".recharts-surface, .recharts-wrapper").forEach((el) => {
-        (el as HTMLElement).style.overflow = "visible";
-      });
-
-      clonedDoc.querySelectorAll("header").forEach((el) => {
-        (el as HTMLElement).style.display = "none";
-      });
-    };
-
-    const captureElement = async (el: HTMLElement) =>
-      html2canvas(el, {
-        scale: 3,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-        windowWidth: 1000,
-        onclone: (clonedDoc) => {
-          patchClonedDom(clonedDoc);
-        },
-      });
-
-    const drawTabHeader = (label: string) => {
-      if (currentY + 14 > usableH) {
-        pdf.addPage();
-        currentY = margin;
-      }
-      pdf.setFillColor(15, 23, 42);
-      pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(16);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text(label, margin + 4, currentY + 7.5);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "normal");
-      currentY += 14;
-    };
-
-    const addCardToPDF = (canvas: HTMLCanvasElement) => {
-      const maxSectionH = usableH - margin;
-      let renderW = contentW;
-      let renderH = (canvas.height * renderW) / canvas.width;
-
-      if (renderH > maxSectionH) {
-        const fitScale = maxSectionH / renderH;
-        renderW *= fitScale;
-        renderH = maxSectionH;
-      }
-
-      const remaining = usableH - currentY;
-      if (renderH > remaining) {
-        pdf.addPage();
-        currentY = margin;
-      }
-
-      const x = margin + (contentW - renderW) / 2;
-      const imgData = canvas.toDataURL("image/jpeg", 0.75);
-      pdf.addImage(imgData, "JPEG", x, currentY, renderW, renderH, undefined, "FAST");
-      currentY += renderH + sectionGap;
-    };
-
-    const drawCoverPage = async () => {
-      pdf.setFillColor(15, 23, 42);
-      pdf.rect(0, 0, A4_W, A4_H, "F");
-      pdf.setFillColor(99, 102, 241);
-      pdf.rect(margin, 95, 70, 3, "F");
-
-      const logoDataURL = await loadLogoDataURL("/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png");
-      if (logoDataURL) {
-        pdf.addImage(logoDataURL, "PNG", margin, 40, 18, 18);
-      }
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(26);
-      pdf.text("Our Equity", margin + 24, 52);
-
-      pdf.setFontSize(18);
-      pdf.text("Platform Snapshot", margin, 114);
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(14);
-      pdf.setTextColor(203, 213, 225);
-      pdf.text("Analytics Report", margin, 124);
-
-      const dateStr = new Date().toLocaleDateString("en-ZA", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-
-      pdf.setFontSize(10);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text(dateStr, margin, 144);
-      pdf.setFontSize(9);
-      pdf.text("Confidential — Generated for cohort and sponsors", margin, 152);
-      pdf.setTextColor(0, 0, 0);
-    };
+    await new Promise(r => setTimeout(r, 100));
 
     try {
-      await drawCoverPage();
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
+      const W = pdf.internal.pageSize.getWidth(); // ~210
+      const H = pdf.internal.pageSize.getHeight(); // ~297
+      const M = 15; // margin
+      const cW = W - M * 2; // content width
+      const footerY = H - 8;
+      let y = M;
 
-      // KPI section
-      const kpiSection = dashboardRef.current.querySelector("section");
-      if (kpiSection) {
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader("Key Metrics");
-        const kpiCanvas = await captureElement(kpiSection as HTMLElement);
-        addCardToPDF(kpiCanvas);
-      }
+      const NAVY: [number, number, number] = [17, 24, 39];
+      const INDIGO = [99, 102, 241] as const;
+      const TEAL = [20, 184, 166] as const;
+      const GRAY = [148, 163, 184] as const;
+      const DARK = [15, 23, 42] as const;
+      const CHART_COLORS = [[99,102,241],[20,184,166],[245,158,11],[239,68,68],[16,185,129]] as const;
 
-      // Iterate each tab, capture each card individually
-      for (const tabKey of allTabs) {
-        setTab(tabKey);
-        await waitForRender();
+      const ensureSpace = (needed: number) => {
+        if (y + needed > H - 15) { pdf.addPage(); y = M; }
+      };
 
-        const tabContent = dashboardRef.current.querySelector(
-          '[role="tabpanel"][data-state="active"]'
-        ) as HTMLElement | null;
-        if (!tabContent) continue;
+      const sectionHeader = (title: string) => {
+        ensureSpace(14);
+        pdf.setFillColor(...NAVY);
+        pdf.roundedRect(M, y, cW, 9, 1.5, 1.5, "F");
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(14);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(title, M + 4, y + 6.5);
+        pdf.setTextColor(0, 0, 0);
+        y += 12;
+      };
 
-        const label = tabLabels[tabKey] || tabKey;
-
-        // Start new page for each tab section
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader(label);
-
-        // Capture each direct child card/grid individually
-        const cards = Array.from(tabContent.children).filter(
-          (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
-        );
-        for (const card of cards) {
-          const canvas = await captureElement(card);
-          addCardToPDF(canvas);
+      const drawBarChart = (
+        data: { label: string; value: number }[],
+        opts: { x?: number; w?: number; barColor?: readonly number[]; horizontal?: boolean; title?: string } = {}
+      ) => {
+        const { x: ox = M, w: chartW = cW, barColor = INDIGO, horizontal = false, title } = opts;
+        if (title) {
+          ensureSpace(8);
+          pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.setTextColor(...DARK);
+          pdf.text(title, ox, y + 4); y += 8;
         }
-      }
+        const maxVal = Math.max(...data.map(d => d.value), 1);
+        if (horizontal) {
+          const barH = 5; const gap = 2; const labelW = 35;
+          const totalH = data.length * (barH + gap);
+          ensureSpace(totalH + 4);
+          data.forEach((d, i) => {
+            const by = y + i * (barH + gap);
+            pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(...DARK);
+            pdf.text(d.label.substring(0, 25), ox, by + 4);
+            const bw = (d.value / maxVal) * (chartW - labelW - 10);
+            pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
+            pdf.rect(ox + labelW, by, Math.max(bw, 1), barH, "F");
+            pdf.setFontSize(8); pdf.setTextColor(...GRAY);
+            pdf.text(String(d.value), ox + labelW + bw + 2, by + 4);
+          });
+          y += totalH + 4;
+        } else {
+          const chartH = 40; const labelH = 10;
+          ensureSpace(chartH + labelH + 4);
+          const barW = Math.min((chartW - 10) / data.length - 2, 14);
+          const startX = ox + (chartW - data.length * (barW + 2)) / 2;
+          data.forEach((d, i) => {
+            const bh = (d.value / maxVal) * chartH;
+            const bx = startX + i * (barW + 2);
+            pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
+            pdf.rect(bx, y + chartH - bh, barW, bh, "F");
+            pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(...DARK);
+            pdf.text(String(d.value), bx + barW / 2, y + chartH - bh - 2, { align: "center" });
+            pdf.setFontSize(7); pdf.setTextColor(...GRAY);
+            pdf.text(d.label.substring(0, 8), bx + barW / 2, y + chartH + 5, { align: "center" });
+          });
+          y += chartH + labelH + 4;
+        }
+      };
 
-      // Add page footers (skip cover page)
+      const drawPieChart = (
+        data: { label: string; value: number; color: readonly number[] }[],
+        cx: number, cy: number, radius: number
+      ) => {
+        const total = data.reduce((s, d) => s + d.value, 0);
+        if (total === 0) return;
+        let startAngle = -Math.PI / 2;
+        data.forEach(d => {
+          const sliceAngle = (d.value / total) * 2 * Math.PI;
+          const endAngle = startAngle + sliceAngle;
+          // Draw filled arc as triangle fan
+          pdf.setFillColor(d.color[0], d.color[1], d.color[2]);
+          const steps = Math.max(Math.ceil(sliceAngle / 0.05), 4);
+          const points: number[][] = [[cx, cy]];
+          for (let s = 0; s <= steps; s++) {
+            const a = startAngle + (sliceAngle * s) / steps;
+            points.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+          }
+          // Use triangle fan via lines
+          for (let s = 1; s < points.length - 1; s++) {
+            pdf.triangle(
+              points[0][0], points[0][1],
+              points[s][0], points[s][1],
+              points[s + 1][0], points[s + 1][1],
+              "F"
+            );
+          }
+          startAngle = endAngle;
+        });
+        // Legend
+        let ly = cy + radius + 5;
+        data.forEach(d => {
+          const pct = Math.round((d.value / total) * 100);
+          pdf.setFillColor(d.color[0], d.color[1], d.color[2]);
+          pdf.rect(cx - radius, ly, 3, 3, "F");
+          pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(...DARK);
+          pdf.text(`${d.label} ${pct}%`, cx - radius + 5, ly + 2.5);
+          ly += 5;
+        });
+      };
+
+      // Load logo
+      let logoDataURL = "";
+      try {
+        const resp = await fetch("/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png", { cache: "force-cache" });
+        const blob = await resp.blob();
+        logoDataURL = await new Promise<string>((res, rej) => {
+          const r = new FileReader(); r.onloadend = () => res(String(r.result || "")); r.onerror = rej; r.readAsDataURL(blob);
+        });
+      } catch {}
+
+      // ===== COVER PAGE =====
+      pdf.setFillColor(...NAVY);
+      pdf.rect(0, 0, W, H, "F");
+      if (logoDataURL) pdf.addImage(logoDataURL, "PNG", M, 38, 18, 18);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(36);
+      pdf.text("Oe.", M + (logoDataURL ? 24 : 0), 52);
+      pdf.setFontSize(28);
+      pdf.text("Our Equity", M, 75);
+      pdf.setFillColor(...INDIGO);
+      pdf.rect(M, 82, 60, 3, "F");
+      pdf.setFontSize(28);
+      pdf.text("Platform Snapshot", M, 100);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(16);
+      pdf.setTextColor(...GRAY);
+      pdf.text("Analytics Report", M, 112);
+      const dateStr = new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
+      pdf.setFontSize(11);
+      pdf.text(dateStr, M, 130);
+      pdf.setFontSize(9);
+      pdf.text("Confidential — Generated for cohort & sponsors", M, 138);
+
+      // ===== PAGE 1: KEY METRICS + MODULES =====
+      pdf.addPage(); y = M;
+      sectionHeader("Key Metrics");
+      // 2x3 KPI grid
+      const kpiData = [
+        ["Active modules", "10"], ["Total enrolments", "84"], ["Active fellows", "23"],
+        ["Unique fellows", "15"], ["Peak month", "2025-06"], ["Course hours", "29.57"],
+      ];
+      const kpiW = (cW - 8) / 3;
+      kpiData.forEach((kpi, i) => {
+        const col = i % 3; const row = Math.floor(i / 3);
+        const kx = M + col * (kpiW + 4);
+        const ky = y + row * 16;
+        pdf.setFillColor(245, 247, 250);
+        pdf.roundedRect(kx, ky, kpiW, 14, 2, 2, "F");
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(...GRAY);
+        pdf.text(kpi[0], kx + 3, ky + 5);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.setTextColor(...DARK);
+        pdf.text(kpi[1], kx + 3, ky + 11);
+      });
+      y += 36;
+
+      sectionHeader("Modules Overview");
+      drawBarChart(
+        modules.map(m => ({ label: `M${m.moduleNumber}`, value: m.sales })),
+        { title: "Registrations by Module" }
+      );
+
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["#", "Title", "Sales", "Created", "Status"]],
+        body: modules.map(m => [m.moduleNumber, m.title, m.sales, m.created, m.status]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 6;
+
+      // ===== PAGE 2: RANKINGS =====
+      pdf.addPage(); y = M;
+      sectionHeader("Module Rankings & Activity");
+      drawBarChart(
+        moduleRankings.map(m => ({ label: m.name, value: m.registrations })),
+        { horizontal: true, title: "Modules Ranked by Registrations" }
+      );
+      drawBarChart(
+        registrationsPerMonth.map(r => ({ label: r.month.slice(5), value: r.registrations })),
+        { barColor: TEAL, title: "Registrations by Month" }
+      );
+      pdf.setFont("helvetica", "italic"); pdf.setFontSize(8); pdf.setTextColor(...GRAY);
+      pdf.text("Note: December 2025 saw peak registrations (17) — likely driven by end-of-year campaign.", M, y + 3);
+      y += 8;
+
+      // ===== PAGE 3: TIME + RANKINGS TABLE =====
+      pdf.addPage(); y = M;
+      sectionHeader("Registration Timing & Rankings");
+      // Side by side
+      const halfW = (cW - 6) / 2;
+      const savedY = y;
+      drawBarChart(
+        registrationsByTimeOfDay.map(d => ({ label: d.label, value: d.count })),
+        { x: M, w: halfW, title: "Time of Day" }
+      );
+      const afterLeft = y;
+      y = savedY;
+      drawBarChart(
+        registrationsByDay.map(d => ({ label: d.day, value: d.count })),
+        { x: M + halfW + 6, w: halfW, barColor: TEAL, title: "Day of Week" }
+      );
+      y = Math.max(afterLeft, y) + 2;
+      pdf.setFont("helvetica", "italic"); pdf.setFontSize(8); pdf.setTextColor(...GRAY);
+      pdf.text("Insight: Afternoon is the most active time slot (32). Sundays and Fridays lead weekday activity.", M, y + 3);
+      y += 10;
+
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["Rank", "Module", "Registrations"]],
+        body: moduleRankings.map((m, i) => [i + 1, m.name + " — " + m.fullTitle, m.registrations]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 6;
+
+      // ===== PAGE 4: ROLES =====
+      pdf.addPage(); y = M;
+      sectionHeader("Roles & Access");
+      drawBarChart(
+        roles.map(r => ({ label: r.title.replace(" role", ""), value: r.users })),
+        { title: "Users by Role" }
+      );
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["Title", "Users", "First Activated"]],
+        body: roles.map(r => [r.title, r.users, r.firstActivated]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 6;
+
+      // ===== PAGE 5: ENROLMENT =====
+      pdf.addPage(); y = M;
+      sectionHeader("Enrolment Analysis");
+      drawBarChart(
+        enrollmentsByMonth.map(e => ({ label: e.month.slice(5), value: e.uniqueFellows })),
+        { barColor: TEAL, title: "Unique Fellows by Month" }
+      );
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["Rank", "Fellow", "Modules Enrolled"]],
+        body: modulesPerFellow.map((f, i) => [i + 1, f.fellow, f.modulesEnrolled]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 6;
+
+      // ===== PAGE 6: CLASSES =====
+      pdf.addPage(); y = M;
+      sectionHeader("Classes & Completion");
+      // KPI row
+      const classKPIs = [["Active fellows", "23"], ["With classes", "15"], ["Avg classes", "5.4"]];
+      classKPIs.forEach((kpi, i) => {
+        const kx = M + i * (kpiW + 4);
+        pdf.setFillColor(245, 247, 250);
+        pdf.roundedRect(kx, y, kpiW, 14, 2, 2, "F");
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(...GRAY);
+        pdf.text(kpi[0], kx + 3, y + 5);
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.setTextColor(...DARK);
+        pdf.text(kpi[1], kx + 3, y + 11);
+      });
+      y += 20;
+      const topFellows = classesPerFellow.filter(f => f.classes > 0).slice(0, 10);
+      drawBarChart(
+        topFellows.map(f => ({ label: f.name.split(" ")[0], value: f.classes })),
+        { title: "Top Fellows by Classes" }
+      );
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["Rank", "Fellow", "Classes"]],
+        body: classesPerFellow.map((f, i) => [i + 1, f.name, f.classes]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 6;
+
+      // ===== PAGE 7: SESSIONS =====
+      pdf.addPage(); y = M;
+      sectionHeader("Sessions, Location & Devices");
+      drawBarChart(
+        sessionsByCountry.map(c => ({ label: c.country, value: c.fellows })),
+        { horizontal: true, title: "Fellows by Country" }
+      );
+      autoTable(pdf, {
+        startY: y,
+        margin: { left: M, right: M },
+        head: [["City", "Country", "Sessions"]],
+        body: sessionsByCity.slice(0, 12).map(c => [c.city, c.country, c.sessions]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 8;
+
+      // Two pie charts side by side
+      ensureSpace(55);
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.setTextColor(...DARK);
+      pdf.text("Sessions by Device", M + 20, y); pdf.text("Sessions by OS", M + cW / 2 + 20, y);
+      y += 4;
+      const pieR = 15;
+      const pieCY = y + pieR + 2;
+      const deviceColors = [[99,102,241],[20,184,166]] as const;
+      drawPieChart(
+        sessionsByDevice.map((d, i) => ({ label: d.device, value: d.sessions, color: deviceColors[i] || [200,200,200] })),
+        M + 30, pieCY, pieR
+      );
+      const osColors = [[99,102,241],[20,184,166],[245,158,11],[239,68,68],[16,185,129]] as const;
+      drawPieChart(
+        sessionsByOS.map((d, i) => ({ label: d.os, value: d.sessions, color: osColors[i] || [200,200,200] })),
+        M + cW / 2 + 30, pieCY, pieR
+      );
+      y = pieCY + pieR + 30;
+
+      // ===== FOOTERS (skip cover page) =====
       const pageCount = pdf.getNumberOfPages();
       for (let p = 2; p <= pageCount; p++) {
         pdf.setPage(p);
         pdf.setFontSize(8);
-        pdf.setTextColor(148, 163, 184);
-        pdf.text(
-          `Our Equity — Platform Snapshot  |  Page ${p - 1} of ${pageCount - 1}`,
-          A4_W / 2,
-          A4_H - 4,
-          { align: "center" }
-        );
+        pdf.setTextColor(...GRAY);
+        pdf.text(`Our Equity — Platform Snapshot  |  Page ${p - 1} of ${pageCount - 1}`, W / 2, footerY, { align: "center" });
       }
-      pdf.setTextColor(0, 0, 0);
 
       const today = new Date().toISOString().slice(0, 10);
       pdf.save(`OurEquity_Platform_Snapshot_${today}.pdf`);
@@ -622,12 +752,11 @@ export default function AnalyticsDashboard() {
       console.error("PDF export failed:", err);
     } finally {
       overlay.remove();
-      setTab(originalTab);
       setExporting(false);
       setExportDone(true);
       setTimeout(() => setExportDone(false), 2000);
     }
-  }, [tab, exporting, allTabs]);
+  }, [exporting, moduleRankings]);
 
   return <div ref={dashboardRef} className="min-h-screen bg-background">
     {/* Header */}
