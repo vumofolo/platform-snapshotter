@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2 } from "lucide-react";
+import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2, Check } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -320,8 +320,8 @@ function KPIChip({ icon: Icon, label, value, tone = "primary" }: KPIChipProps) {
       <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
     </div>
     <div className="min-w-0 flex-1">
-      <div className="text-xs text-muted-foreground truncate">{label}</div>
-      <div className="text-sm sm:text-lg font-semibold text-foreground truncate">{value}</div>
+      <div className="text-xs text-muted-foreground break-words leading-tight">{label}</div>
+      <div className="text-sm sm:text-lg font-semibold text-foreground break-words">{value}</div>
     </div>
   </div>;
 }
@@ -347,6 +347,7 @@ function ProgressRing({ size = 60, stroke = 8, value = 100, label = "" }: Progre
 export default function AnalyticsDashboard() {
   const [tab, setTab] = useState("modules");
   const [exporting, setExporting] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const kpis = useMemo(() => {
     const totalModules = modules.filter(m => m.status === "active").length;
@@ -371,6 +372,7 @@ export default function AnalyticsDashboard() {
     if (!dashboardRef.current || exporting) return;
 
     setExporting(true);
+    setExportDone(false);
     const originalTab = tab;
 
     const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
@@ -393,11 +395,31 @@ export default function AnalyticsDashboard() {
       engagement: "Engagement & Messaging",
     };
 
+    // Create full-screen overlay
+    const overlay = document.createElement("div");
+    overlay.id = "pdf-export-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(15,23,42,0.92);";
+    const logoImg = document.createElement("img");
+    logoImg.src = "/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png";
+    logoImg.style.cssText = "width:48px;height:48px;margin-bottom:16px;";
+    overlay.appendChild(logoImg);
+    const spinnerDiv = document.createElement("div");
+    spinnerDiv.style.cssText = "width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pdfspin 0.8s linear infinite;margin-bottom:16px;";
+    const styleTag = document.createElement("style");
+    styleTag.textContent = "@keyframes pdfspin{to{transform:rotate(360deg)}}";
+    overlay.appendChild(styleTag);
+    overlay.appendChild(spinnerDiv);
+    const msgEl = document.createElement("div");
+    msgEl.textContent = "Generating report...";
+    msgEl.style.cssText = "color:#fff;font-size:16px;font-weight:600;";
+    overlay.appendChild(msgEl);
+    document.body.appendChild(overlay);
+
     const waitForRender = () =>
       new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setTimeout(resolve, 350);
+            setTimeout(resolve, 400);
           });
         });
       });
@@ -450,60 +472,55 @@ export default function AnalyticsDashboard() {
       });
     };
 
-    const captureSection = async (section: HTMLElement) =>
-      html2canvas(section, {
-        scale: 2.5,
+    const captureElement = async (el: HTMLElement) =>
+      html2canvas(el, {
+        scale: 3,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
-        windowWidth: 900,
+        windowWidth: 1000,
         onclone: (clonedDoc) => {
           patchClonedDom(clonedDoc);
         },
       });
 
-    const drawTabHeader = (label: string, continuation = false) => {
-      const title = continuation ? `${label} (cont.)` : label;
+    const drawTabHeader = (label: string) => {
+      if (currentY + 14 > usableH) {
+        pdf.addPage();
+        currentY = margin;
+      }
       pdf.setFillColor(15, 23, 42);
       pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
+      pdf.setFontSize(16);
       pdf.setTextColor(255, 255, 255);
-      pdf.text(title, margin + 4, currentY + 7);
+      pdf.text(label, margin + 4, currentY + 7.5);
       pdf.setTextColor(0, 0, 0);
       pdf.setFont("helvetica", "normal");
-      currentY += 12;
+      currentY += 14;
     };
 
-    const addSectionToPDF = (canvas: HTMLCanvasElement, label: string) => {
+    const addCardToPDF = (canvas: HTMLCanvasElement) => {
       const maxSectionH = usableH - margin;
       let renderW = contentW;
       let renderH = (canvas.height * renderW) / canvas.width;
-      let x = margin;
 
       if (renderH > maxSectionH) {
         const fitScale = maxSectionH / renderH;
         renderW *= fitScale;
         renderH = maxSectionH;
-        x = margin + (contentW - renderW) / 2;
       }
 
       const remaining = usableH - currentY;
-      if (renderH > remaining && currentY > margin + (usableH - margin) * 0.4) {
+      if (renderH > remaining) {
         pdf.addPage();
         currentY = margin;
-        drawTabHeader(label, true);
       }
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.82);
+      const x = margin + (contentW - renderW) / 2;
+      const imgData = canvas.toDataURL("image/jpeg", 0.75);
       pdf.addImage(imgData, "JPEG", x, currentY, renderW, renderH, undefined, "FAST");
       currentY += renderH + sectionGap;
-    };
-
-    const getTabSections = (tabContent: HTMLElement) => {
-      return Array.from(tabContent.children).filter(
-        (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
-      );
     };
 
     const drawCoverPage = async () => {
@@ -538,24 +555,26 @@ export default function AnalyticsDashboard() {
 
       pdf.setFontSize(10);
       pdf.setTextColor(148, 163, 184);
-      pdf.text(`Generated: ${dateStr}`, margin, 144);
-      pdf.text("Generated for cohort & sponsors", margin, 151);
+      pdf.text(dateStr, margin, 144);
+      pdf.setFontSize(9);
+      pdf.text("Confidential — Generated for cohort and sponsors", margin, 152);
       pdf.setTextColor(0, 0, 0);
     };
 
     try {
       await drawCoverPage();
 
-      // KPI section — start on new page
+      // KPI section
       const kpiSection = dashboardRef.current.querySelector("section");
       if (kpiSection) {
         pdf.addPage();
         currentY = margin;
         drawTabHeader("Key Metrics");
-        const kpiCanvas = await captureSection(kpiSection as HTMLElement);
-        addSectionToPDF(kpiCanvas, "Key Metrics");
+        const kpiCanvas = await captureElement(kpiSection as HTMLElement);
+        addCardToPDF(kpiCanvas);
       }
 
+      // Iterate each tab, capture each card individually
       for (const tabKey of allTabs) {
         setTab(tabKey);
         await waitForRender();
@@ -567,43 +586,46 @@ export default function AnalyticsDashboard() {
 
         const label = tabLabels[tabKey] || tabKey;
 
-        // Only start a new page if current page is >40% used
-        const remaining = usableH - currentY;
-        const usedFraction = (currentY - margin) / (usableH - margin);
-        if (usedFraction > 0.4) {
-          pdf.addPage();
-          currentY = margin;
-        }
+        // Start new page for each tab section
+        pdf.addPage();
+        currentY = margin;
         drawTabHeader(label);
 
-        const sections = getTabSections(tabContent);
-        for (const section of sections) {
-          const canvas = await captureSection(section);
-          addSectionToPDF(canvas, label);
+        // Capture each direct child card/grid individually
+        const cards = Array.from(tabContent.children).filter(
+          (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
+        );
+        for (const card of cards) {
+          const canvas = await captureElement(card);
+          addCardToPDF(canvas);
         }
       }
 
+      // Add page footers (skip cover page)
       const pageCount = pdf.getNumberOfPages();
-      for (let p = 1; p <= pageCount; p++) {
+      for (let p = 2; p <= pageCount; p++) {
         pdf.setPage(p);
-        pdf.setFontSize(7);
+        pdf.setFontSize(8);
         pdf.setTextColor(148, 163, 184);
-        if (p === 1) {
-          pdf.text("Our Equity — Platform Snapshot", A4_W / 2, A4_H - 5, { align: "center" });
-        } else {
-          pdf.text(`Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`, A4_W / 2, A4_H - 5, {
-            align: "center",
-          });
-        }
+        pdf.text(
+          `Our Equity — Platform Snapshot  |  Page ${p - 1} of ${pageCount - 1}`,
+          A4_W / 2,
+          A4_H - 4,
+          { align: "center" }
+        );
       }
       pdf.setTextColor(0, 0, 0);
 
-      pdf.save("OurEquity_Dashboard_Report.pdf");
+      const today = new Date().toISOString().slice(0, 10);
+      pdf.save(`OurEquity_Platform_Snapshot_${today}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
     } finally {
+      overlay.remove();
       setTab(originalTab);
       setExporting(false);
+      setExportDone(true);
+      setTimeout(() => setExportDone(false), 2000);
     }
   }, [tab, exporting, allTabs]);
 
@@ -619,14 +641,20 @@ export default function AnalyticsDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={exportPDF} disabled={exporting}>
-            {exporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Exporting...</> : <><span className="hidden sm:inline">Export PDF</span><span className="sm:hidden">PDF</span></>}
+            {exporting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
+            ) : exportDone ? (
+              <><Check className="mr-2 h-4 w-4 text-green-500" /> Done</>
+            ) : (
+              <><Download className="mr-2 h-4 w-4" /><span className="hidden sm:inline">Export PDF</span><span className="sm:hidden">PDF</span></>
+            )}
           </Button>
         </div>
       </div>
     </header>
 
     {/* KPI Section */}
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
       <KPIChip icon={LayoutGrid} label="Active modules" value={kpis.totalModules} tone="primary" />
       <KPIChip icon={TrendingUp} label="Total enrolments" value={kpis.totalEnrolments} tone="secondary" />
       <KPIChip icon={Users} label="Active fellows" value={kpis.activeFellows} tone="support" />
@@ -1255,8 +1283,16 @@ export default function AnalyticsDashboard() {
       </Tabs>
     </main>
 
-    <footer className="text-xs text-right px-6 py-6 text-muted-foreground">
-      Our Equity — Generated for cohort & sponsors
+    <footer className="border-t bg-card">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <img src="/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png" alt="Our Equity Logo" className="h-5 w-5" />
+          <span className="text-sm font-medium text-foreground">Our Equity — Platform Snapshot</span>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Generated for cohort and sponsors · {new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" })}
+        </div>
+      </div>
     </footer>
   </div>;
 }
