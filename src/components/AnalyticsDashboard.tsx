@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2, Check } from "lucide-react";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import autoTable from "jspdf-autotable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -369,6 +370,7 @@ export default function AnalyticsDashboard() {
   const allTabs = ["modules", "rankings", "roles", "enrol", "classes", "sessions", "engagement"];
 
   const exportPDF = useCallback(async () => {
+    console.log("exportPDF function called");
     if (exporting) return;
     setExporting(true);
     setExportDone(false);
