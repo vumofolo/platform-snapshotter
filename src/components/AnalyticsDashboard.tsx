@@ -366,212 +366,295 @@ export default function AnalyticsDashboard() {
 
   const allTabs = ["modules", "rankings", "roles", "enrol", "classes", "sessions", "engagement"];
 
-  const exportPDF = useCallback(async () => {
-    if (!dashboardRef.current || exporting) return;
+  const exportPDF = useCallback(() => {
+    if (exporting) return;
     setExporting(true);
-    const originalTab = tab;
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const A4_W = pdf.internal.pageSize.getWidth();   // ~210
-    const A4_H = pdf.internal.pageSize.getHeight();   // ~297
-    const margin = 12;
-    const contentW = A4_W - margin * 2;
-    const gap = 5;
-    let currentY = margin;
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const W = pdf.internal.pageSize.getWidth();
+      const H = pdf.internal.pageSize.getHeight();
+      const m = 14; // margin
+      const cw = W - m * 2; // content width
+      let y = m;
 
-    const tabLabels: Record<string, string> = {
-      modules: "Modules Overview",
-      rankings: "Module Rankings & Activity",
-      roles: "Roles & Access",
-      enrol: "Enrolment Analysis",
-      classes: "Classes & Completion",
-      sessions: "Sessions, Location & Devices",
-      engagement: "Engagement & Messaging",
-    };
+      const checkPage = (need: number) => {
+        if (y + need > H - m) { pdf.addPage(); y = m; }
+      };
 
-    // ── helpers ──────────────────────────────────────────────
+      const sectionTitle = (title: string) => {
+        checkPage(14);
+        pdf.setFillColor(15, 23, 42);
+        pdf.roundedRect(m, y, cw, 9, 2, 2, "F");
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(title, m + 4, y + 6.5);
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont("helvetica", "normal");
+        y += 13;
+      };
 
-    /** Wait for React to re-render + Recharts to finish animating */
-    const waitForRender = () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          // Extra frame for Recharts animation settle
-          requestAnimationFrame(() => {
-            setTimeout(resolve, 800);
-          });
+      const drawTable = (headers: string[], rows: string[][], colWidths: number[]) => {
+        const rowH = 7;
+        const fontSize = 7.5;
+
+        // Header
+        checkPage(rowH * 2);
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(m, y, cw, rowH, "F");
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(fontSize);
+        let x = m + 2;
+        headers.forEach((h, i) => {
+          pdf.text(h, x, y + 5);
+          x += colWidths[i];
         });
-      });
+        y += rowH;
+        pdf.setFont("helvetica", "normal");
 
-    /** Draw a section title bar in the PDF */
-    const drawTabHeader = (label: string) => {
-      if (currentY + 14 > A4_H - margin) {
-        pdf.addPage();
-        currentY = margin;
-      }
-      pdf.setFillColor(30, 41, 59);                   // slate-800
-      pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text(label, margin + 4, currentY + 7);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "normal");
-      currentY += 10 + gap;
-    };
+        // Rows
+        rows.forEach((row, ri) => {
+          checkPage(rowH);
+          if (ri % 2 === 1) {
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(m, y, cw, rowH, "F");
+          }
+          x = m + 2;
+          row.forEach((cell, ci) => {
+            const maxW = colWidths[ci] - 3;
+            const truncated = pdf.getStringUnitWidth(cell) * fontSize / pdf.internal.scaleFactor > maxW
+              ? cell.substring(0, Math.floor(maxW / 2)) + "…"
+              : cell;
+            pdf.text(truncated, x, y + 5);
+            x += colWidths[ci];
+          });
+          y += rowH;
+        });
+        y += 4;
+      };
 
-    /** Place an image from html2canvas onto the PDF, handling page overflow */
-    const addImageToPDF = (imgData: string, imgWidthPx: number, imgHeightPx: number) => {
-      const scale = contentW / imgWidthPx;
-      const sectionH = imgHeightPx * scale;
-      const maxPageH = A4_H - margin * 2;
+      const drawBar = (data: { label: string; value: number }[], title: string, barColor = [99, 102, 241]) => {
+        checkPage(55);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9);
+        pdf.text(title, m, y + 4);
+        y += 8;
+        const maxVal = Math.max(...data.map(d => d.value), 1);
+        const barH = 5;
+        const labelW = 45;
+        const barAreaW = cw - labelW - 15;
+        data.forEach(d => {
+          checkPage(barH + 2);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7);
+          const label = d.label.length > 25 ? d.label.substring(0, 24) + "…" : d.label;
+          pdf.text(label, m, y + 4);
+          const bw = (d.value / maxVal) * barAreaW;
+          pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
+          pdf.roundedRect(m + labelW, y, bw, barH, 1, 1, "F");
+          pdf.setFontSize(7);
+          pdf.text(String(d.value), m + labelW + bw + 2, y + 4);
+          y += barH + 2;
+        });
+        y += 4;
+      };
 
-      // Fits remaining space → place it
-      if (currentY + sectionH <= A4_H - margin) {
-        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
-        currentY += sectionH + gap;
-        return;
-      }
-
-      // Doesn't fit but we're not at the top → new page first
-      if (currentY > margin + 1) {
-        pdf.addPage();
-        currentY = margin;
-      }
-
-      // After moving to top, does it fit a full page?
-      if (sectionH <= maxPageH) {
-        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
-        currentY += sectionH + gap;
-        return;
-      }
-
-      // Section taller than a full page → scale width to fit height onto one page
-      // This preserves readability better than clipping
-      const fitScale = maxPageH / sectionH;
-      const fitW = contentW * fitScale;
-      const xOffset = margin + (contentW - fitW) / 2;
-      pdf.addImage(imgData, "PNG", xOffset, currentY, fitW, maxPageH);
-      currentY += maxPageH + gap;
-    };
-
-    // ── cover page ──────────────────────────────────────────
-
-    const drawCoverPage = () => {
-      pdf.setFillColor(15, 23, 42);                    // slate-900
-      pdf.rect(0, 0, A4_W, A4_H, "F");
-
-      // Accent line
-      pdf.setFillColor(99, 102, 241);                  // indigo-500
-      pdf.rect(margin, 100, 60, 3, "F");
-
+      // ── COVER PAGE ──
+      pdf.setFillColor(15, 23, 42);
+      pdf.rect(0, 0, W, H, "F");
+      pdf.setFillColor(99, 102, 241);
+      pdf.rect(m, 100, 60, 3, "F");
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(28);
-      pdf.text("Our Equity", margin, 120);
-
+      pdf.text("Our Equity", m, 120);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(203, 213, 225);                  // slate-300
-      pdf.text("Platform Snapshot Report", margin, 132);
-
+      pdf.setTextColor(203, 213, 225);
+      pdf.text("Platform Snapshot Report", m, 132);
       pdf.setFontSize(10);
-      pdf.setTextColor(148, 163, 184);                  // slate-400
-      const dateStr = new Date().toLocaleDateString("en-ZA", {
-        year: "numeric", month: "long", day: "numeric",
+      pdf.setTextColor(148, 163, 184);
+      const dateStr = new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
+      pdf.text(`Generated: ${dateStr}`, m, 148);
+      pdf.text("Confidential — For cohort & sponsors", m, 156);
+
+      // ── KEY METRICS ──
+      pdf.addPage();
+      y = m;
+      sectionTitle("Key Metrics");
+      const metricPairs = [
+        ["Active Modules", String(kpis.totalModules)],
+        ["Active Fellows", String(kpis.activeFellows)],
+        ["Total Enrolments", String(kpis.totalEnrolments)],
+        ["Total Platform Hours", String(kpis.totalHours) + "h"],
+        ["Peak Enrolment Month", kpis.peakMonth],
+        ["Unique Fellows", String(kpis.uniqueFellows)],
+      ];
+      pdf.setFontSize(9);
+      metricPairs.forEach(([label, val]) => {
+        checkPage(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(label + ":", m, y + 5);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(val, m + 50, y + 5);
+        y += 8;
       });
-      pdf.text(`Generated: ${dateStr}`, margin, 148);
-      pdf.text("Generated for cohort & sponsors", margin, 156);
+      y += 4;
 
-      // Reset for content pages
-      pdf.setTextColor(0, 0, 0);
-    };
+      // ── MODULES ──
+      sectionTitle("Modules Overview");
+      drawTable(
+        ["#", "Title", "Registrations", "Status"],
+        modules.map(mod => [String(mod.moduleNumber), mod.title, String(mod.sales), mod.status]),
+        [10, 105, 30, 25]
+      );
 
-    // ── main export loop ────────────────────────────────────
+      // ── MODULE RANKINGS ──
+      sectionTitle("Module Rankings");
+      drawBar(
+        moduleRankings.map(r => ({ label: r.fullTitle, value: r.registrations })),
+        "Registrations by Module"
+      );
 
-    try {
-      drawCoverPage();
+      // ── ROLES ──
+      sectionTitle("Roles & Access");
+      drawTable(
+        ["Role", "Users", "First Activated"],
+        roles.map(r => [r.title, String(r.users), r.firstActivated]),
+        [60, 30, 50]
+      );
 
-      // Capture the KPI row (above tabs, always visible)
-      const kpiSection = dashboardRef.current.querySelector("section");
-      if (kpiSection) {
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader("Key Metrics");
-        const kpiCanvas = await html2canvas(kpiSection as HTMLElement, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-          windowWidth: 1280,
-        });
-        addImageToPDF(kpiCanvas.toDataURL("image/png"), kpiCanvas.width, kpiCanvas.height);
-      }
+      // ── ENROLMENT ──
+      sectionTitle("Enrolment Analysis");
+      drawBar(
+        enrollmentsByMonth.map(e => ({ label: e.month, value: e.uniqueFellows })),
+        "Unique Fellows per Month",
+        [34, 197, 94]
+      );
+      drawBar(
+        registrationsPerMonth.map(e => ({ label: e.month, value: e.registrations })),
+        "Total Registrations per Month"
+      );
+      drawBar(
+        registrationsByTimeOfDay.map(e => ({ label: e.label, value: e.count })),
+        "Registrations by Time of Day",
+        [251, 146, 60]
+      );
+      drawBar(
+        registrationsByDay.map(e => ({ label: e.day, value: e.count })),
+        "Registrations by Day of Week",
+        [14, 165, 233]
+      );
 
-      for (let i = 0; i < allTabs.length; i++) {
-        const tabKey = allTabs[i];
-        setTab(tabKey);
-        await waitForRender();
+      // ── FELLOWS PER MODULE ──
+      sectionTitle("Fellows — Modules Enrolled");
+      drawTable(
+        ["Fellow", "Modules Enrolled"],
+        modulesPerFellow.map(f => [f.fellow, String(f.modulesEnrolled)]),
+        [120, 40]
+      );
 
-        // Start each tab section on a fresh page
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader(tabLabels[tabKey] || tabKey);
+      // ── CLASSES ──
+      sectionTitle("Classes per Fellow");
+      drawTable(
+        ["Fellow", "Classes"],
+        classesPerFellow.map(f => [f.name, String(f.classes)]),
+        [120, 40]
+      );
 
-        const tabContent = dashboardRef.current.querySelector(
-          '[role="tabpanel"][data-state="active"]'
-        );
-        if (!tabContent) continue;
+      // ── FELLOW STATUSES ──
+      sectionTitle("Fellow Statuses");
+      drawTable(
+        ["Fellow", "Status"],
+        fellowStatuses.map(f => [f.name, f.status]),
+        [120, 40]
+      );
 
-        const topSections = Array.from(tabContent.children) as HTMLElement[];
+      // ── SESSIONS ──
+      sectionTitle("Sessions — Geographic Distribution");
+      drawTable(
+        ["Country", "Sessions", "Fellows"],
+        sessionsByCountry.map(s => [s.country, String(s.sessions), String(s.fellows)]),
+        [60, 40, 40]
+      );
+      drawTable(
+        ["City", "Country", "Sessions"],
+        sessionsByCity.map(s => [s.city, s.country, String(s.sessions)]),
+        [55, 50, 35]
+      );
 
-        for (const section of topSections) {
-          if (section.offsetHeight < 10) continue;
+      sectionTitle("Sessions — Devices & OS");
+      drawTable(
+        ["Device", "Sessions"],
+        sessionsByDevice.map(s => [s.device, String(s.sessions)]),
+        [80, 40]
+      );
+      drawTable(
+        ["OS", "Sessions"],
+        sessionsByOS.map(s => [s.os, String(s.sessions)]),
+        [80, 40]
+      );
 
-          const canvas = await html2canvas(section, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: "#ffffff",
-            windowWidth: 1280,
-            onclone: (clonedDoc) => {
-              // Force white background on the cloned element so CSS vars resolve
-              const clonedEl = clonedDoc.body;
-              clonedEl.style.backgroundColor = "#ffffff";
-              clonedEl.style.color = "#0f172a";
-              // Force all Card borders to be visible
-              clonedDoc.querySelectorAll("[class*='Card'], [class*='card']").forEach((el) => {
-                (el as HTMLElement).style.borderColor = "#e2e8f0";
-              });
-            },
-          });
-          const imgData = canvas.toDataURL("image/png");
-          addImageToPDF(imgData, canvas.width, canvas.height);
-        }
-      }
+      sectionTitle("Sessions per Month");
+      drawBar(
+        sessionsPerMonth.map(s => ({ label: s.month, value: s.sessions })),
+        "Monthly Sessions",
+        [14, 165, 233]
+      );
 
-      // ── footer on each page ──
-      const pageCount = pdf.getNumberOfPages();
-      for (let p = 2; p <= pageCount; p++) {
+      sectionTitle("Session Time of Day");
+      drawBar(
+        sessionsByTimeOfDay.map(s => ({ label: s.label, value: s.count })),
+        "Login Times",
+        [251, 146, 60]
+      );
+
+      // ── DURATION RANKING ──
+      sectionTitle("Duration Ranking");
+      drawTable(
+        ["Fellow", "Total Time", "Tier"],
+        durationPerFellow.map(d => [d.fellow, d.display, d.tier]),
+        [80, 40, 30]
+      );
+
+      // ── FELLOW ACTIVITY ──
+      sectionTitle("Fellow Activity Correlation");
+      drawTable(
+        ["Fellow", "Country", "City", "Sessions", "Peak", "Device"],
+        fellowActivity.map(f => [f.fellow, f.country, f.city, String(f.sessions), f.peakTime, f.device]),
+        [38, 28, 34, 18, 22, 22]
+      );
+
+      // ── ENGAGEMENT ──
+      sectionTitle("Engagement & Messaging");
+      drawTable(
+        ["Month", "Entries"],
+        engagementByMonth.map(e => [e.month, String(e.entries)]),
+        [80, 40]
+      );
+      drawTable(
+        ["Username", "Subject", "Status", "Created"],
+        messagePreview.map(m => [m.username, m.subject, m.status, m.created]),
+        [40, 45, 30, 40]
+      );
+
+      // ── FOOTERS ──
+      const pages = pdf.getNumberOfPages();
+      for (let p = 2; p <= pages; p++) {
         pdf.setPage(p);
         pdf.setFontSize(7);
         pdf.setTextColor(148, 163, 184);
-        pdf.text(
-          `Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`,
-          A4_W / 2,
-          A4_H - 5,
-          { align: "center" }
-        );
+        pdf.text(`Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pages - 1}`, W / 2, H - 5, { align: "center" });
       }
-      pdf.setTextColor(0, 0, 0);
 
       pdf.save("OurEquity_Dashboard_Report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
     } finally {
-      setTab(originalTab);
       setExporting(false);
     }
-  }, [tab, exporting]);
+  }, [exporting, kpis, moduleRankings]);
 
   return <div ref={dashboardRef} className="min-h-screen bg-background">
     {/* Header */}
