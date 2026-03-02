@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2 } from "lucide-react";
-import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
