@@ -378,7 +378,8 @@ export default function AnalyticsDashboard() {
     const A4_H = pdf.internal.pageSize.getHeight();
     const margin = 12;
     const contentW = A4_W - margin * 2;
-    const gap = 4;
+    const pageBottom = A4_H - margin - 8;
+    const sectionGap = 3;
     let currentY = margin;
 
     const tabLabels: Record<string, string> = {
@@ -395,122 +396,147 @@ export default function AnalyticsDashboard() {
       new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setTimeout(resolve, 500);
+            setTimeout(resolve, 350);
           });
         });
       });
 
-    const drawTabHeader = (label: string) => {
-      if (currentY + 14 > A4_H - margin) {
-        pdf.addPage();
-        currentY = margin;
+    const loadLogoDataURL = async (path: string) => {
+      try {
+        const response = await fetch(path, { cache: "force-cache" });
+        const blob = await response.blob();
+        return await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Failed to read logo file"));
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return "";
       }
+    };
+
+    const captureSection = async (section: HTMLElement) =>
+      html2canvas(section, {
+        scale: 1.4,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 1280,
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement("style");
+          style.innerHTML = `
+            * { animation: none !important; transition: none !important; }
+            body { background: #ffffff !important; color: #0f172a !important; }
+          `;
+          clonedDoc.head.appendChild(style);
+        },
+      });
+
+    const drawTabHeader = (label: string, continuation = false) => {
+      const title = continuation ? `${label} (cont.)` : label;
       pdf.setFillColor(15, 23, 42);
       pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(11);
       pdf.setTextColor(255, 255, 255);
-      pdf.text(label, margin + 4, currentY + 7);
+      pdf.text(title, margin + 4, currentY + 7);
       pdf.setTextColor(0, 0, 0);
       pdf.setFont("helvetica", "normal");
-      currentY += 10 + gap;
+      currentY += 12;
     };
 
-    const addSectionToPDF = (canvas: HTMLCanvasElement, forceNewPage = false) => {
-      const maxPageH = A4_H - margin * 2;
+    const startTabPage = (label: string, continuation = false) => {
+      pdf.addPage();
+      currentY = margin;
+      drawTabHeader(label, continuation);
+    };
+
+    const addSectionToPDF = (canvas: HTMLCanvasElement, label: string) => {
+      const maxSectionH = pageBottom - margin;
       let renderW = contentW;
       let renderH = (canvas.height * renderW) / canvas.width;
       let x = margin;
 
-      if (renderH > maxPageH) {
-        const fitScale = maxPageH / renderH;
+      if (renderH > maxSectionH) {
+        const fitScale = maxSectionH / renderH;
         renderW *= fitScale;
-        renderH = maxPageH;
+        renderH = maxSectionH;
         x = margin + (contentW - renderW) / 2;
       }
 
-      if (forceNewPage && currentY > margin + 1) {
-        pdf.addPage();
-        currentY = margin;
+      if (currentY + renderH > pageBottom) {
+        startTabPage(label, true);
       }
 
-      if (currentY + renderH > A4_H - margin) {
-        pdf.addPage();
-        currentY = margin;
-      }
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.86);
+      const imgData = canvas.toDataURL("image/jpeg", 0.82);
       pdf.addImage(imgData, "JPEG", x, currentY, renderW, renderH, undefined, "FAST");
-      currentY += renderH + gap;
+      currentY += renderH + sectionGap;
     };
 
     const getTabSections = (tabContent: HTMLElement) => {
       const sections: HTMLElement[] = [];
       const directChildren = Array.from(tabContent.children).filter(
-        (el): el is HTMLElement => el instanceof HTMLElement
+        (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
       );
 
       for (const child of directChildren) {
         if (child.classList.contains("grid")) {
-          const nested = Array.from(child.children).filter(
-            (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
-          );
-          if (nested.length) {
-            sections.push(...nested);
-            continue;
-          }
+          sections.push(child);
+          continue;
         }
-        if (child.offsetHeight > 10) sections.push(child);
+
+        sections.push(child);
       }
 
       return sections;
     };
 
-    const drawCoverPage = () => {
+    const drawCoverPage = async () => {
       pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 0, A4_W, A4_H, "F");
       pdf.setFillColor(99, 102, 241);
-      pdf.rect(margin, 100, 60, 3, "F");
+      pdf.rect(margin, 95, 70, 3, "F");
+
+      const logoDataURL = await loadLogoDataURL("/lovable-uploads/4698deb9-2a88-44ac-bafb-46922f916821.png");
+      if (logoDataURL) {
+        pdf.addImage(logoDataURL, "PNG", margin, 40, 18, 18);
+      }
 
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(28);
-      pdf.text("Our Equity", margin, 120);
+      pdf.setFontSize(26);
+      pdf.text("Our Equity", margin + 24, 52);
 
-      pdf.setFontSize(16);
+      pdf.setFontSize(18);
+      pdf.text("Platform Snapshot", margin, 114);
+
       pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(14);
       pdf.setTextColor(203, 213, 225);
-      pdf.text("Platform Snapshot Report", margin, 132);
+      pdf.text("Analytics Report", margin, 124);
 
-      pdf.setFontSize(10);
-      pdf.setTextColor(148, 163, 184);
       const dateStr = new Date().toLocaleDateString("en-ZA", {
         year: "numeric",
         month: "long",
         day: "numeric",
       });
-      pdf.text(`Generated: ${dateStr}`, margin, 148);
-      pdf.text("Generated for cohort & sponsors", margin, 156);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text(`Generated: ${dateStr}`, margin, 144);
+      pdf.text("Generated for cohort & sponsors", margin, 151);
       pdf.setTextColor(0, 0, 0);
     };
 
     try {
-      drawCoverPage();
+      await drawCoverPage();
 
       const kpiSection = dashboardRef.current.querySelector("section");
       if (kpiSection) {
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader("Key Metrics");
-
-        const kpiCanvas = await html2canvas(kpiSection as HTMLElement, {
-          scale: 1.8,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-          windowWidth: 1440,
-        });
-        addSectionToPDF(kpiCanvas, false);
+        startTabPage("Key Metrics");
+        const kpiCanvas = await captureSection(kpiSection as HTMLElement);
+        addSectionToPDF(kpiCanvas, "Key Metrics");
       }
 
       for (const tabKey of allTabs) {
@@ -522,47 +548,28 @@ export default function AnalyticsDashboard() {
         ) as HTMLElement | null;
         if (!tabContent) continue;
 
-        pdf.addPage();
-        currentY = margin;
-        drawTabHeader(tabLabels[tabKey] || tabKey);
+        const label = tabLabels[tabKey] || tabKey;
+        startTabPage(label);
 
         const sections = getTabSections(tabContent);
-
         for (const section of sections) {
-          const hasChart = !!section.querySelector(".recharts-responsive-container");
-
-          const canvas = await html2canvas(section, {
-            scale: 1.8,
-            useCORS: true,
-            logging: false,
-            backgroundColor: "#ffffff",
-            windowWidth: 1440,
-            onclone: (clonedDoc) => {
-              const style = clonedDoc.createElement("style");
-              style.innerHTML = `
-                * { animation: none !important; transition: none !important; }
-                body { background: #ffffff !important; color: #0f172a !important; }
-              `;
-              clonedDoc.head.appendChild(style);
-            },
-          });
-
-          // Graph sections are kept intact by starting them on a fresh page when needed.
-          addSectionToPDF(canvas, hasChart);
+          const canvas = await captureSection(section);
+          addSectionToPDF(canvas, label);
         }
       }
 
       const pageCount = pdf.getNumberOfPages();
-      for (let p = 2; p <= pageCount; p++) {
+      for (let p = 1; p <= pageCount; p++) {
         pdf.setPage(p);
         pdf.setFontSize(7);
         pdf.setTextColor(148, 163, 184);
-        pdf.text(
-          `Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`,
-          A4_W / 2,
-          A4_H - 5,
-          { align: "center" }
-        );
+        if (p === 1) {
+          pdf.text("Our Equity — Platform Snapshot", A4_W / 2, A4_H - 5, { align: "center" });
+        } else {
+          pdf.text(`Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`, A4_W / 2, A4_H - 5, {
+            align: "center",
+          });
+        }
       }
       pdf.setTextColor(0, 0, 0);
 
