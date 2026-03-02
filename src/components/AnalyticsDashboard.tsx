@@ -372,37 +372,72 @@ export default function AnalyticsDashboard() {
     setExporting(true);
     const originalTab = tab;
     const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    const A4_W = pdf.internal.pageSize.getWidth();
+    const A4_H = pdf.internal.pageSize.getHeight();
     const margin = 10;
+    const contentW = A4_W - margin * 2;
+    const gap = 4;
+    let currentY = margin;
+    let isFirstPage = true;
+
+    const addSectionToPDF = (imgData: string, imgWidthPx: number, imgHeightPx: number) => {
+      const scaleFactor = contentW / imgWidthPx;
+      const sectionH = imgHeightPx * scaleFactor;
+
+      // If section won't fit on current page and we're not at the top, start new page
+      if (currentY + sectionH > A4_H - margin && currentY > margin) {
+        pdf.addPage();
+        currentY = margin;
+      } else if (!isFirstPage && currentY === margin) {
+        // Already on a fresh page
+      }
+
+      // If a single section is taller than a full page, scale it down to fit
+      const maxH = A4_H - margin * 2;
+      if (sectionH > maxH) {
+        const fitScale = maxH / sectionH;
+        const fitW = contentW * fitScale;
+        const fitH = sectionH * fitScale;
+        const xOffset = margin + (contentW - fitW) / 2;
+        pdf.addImage(imgData, "PNG", xOffset, currentY, fitW, fitH);
+        currentY += fitH + gap;
+      } else {
+        pdf.addImage(imgData, "PNG", margin, currentY, contentW, sectionH);
+        currentY += sectionH + gap;
+      }
+      isFirstPage = false;
+    };
 
     try {
       for (let i = 0; i < allTabs.length; i++) {
         setTab(allTabs[i]);
-        // Wait for re-render and charts to settle
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
 
-        const canvas = await html2canvas(dashboardRef.current, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-          windowWidth: 1280,
-        });
+        // Add a tab title page separator
+        if (i > 0) {
+          pdf.addPage();
+          currentY = margin;
+        }
 
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = pageWidth - margin * 2;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        // Find all Card sections within the active tab content
+        const tabContent = dashboardRef.current.querySelector('[role="tabpanel"][data-state="active"]');
+        if (!tabContent) continue;
 
-        if (i > 0) pdf.addPage();
+        const sections = tabContent.querySelectorAll(':scope > div, :scope > .grid, :scope > [class*="Card"], :scope > div > [class*="Card"]');
+        // Collect top-level children as sections
+        const topSections = Array.from(tabContent.children) as HTMLElement[];
 
-        // If content is taller than one page, split across pages
-        let yOffset = 0;
-        const maxContentHeight = pageHeight - margin * 2;
-        while (yOffset < imgHeight) {
-          if (yOffset > 0) pdf.addPage();
-          pdf.addImage(imgData, "PNG", margin, margin - yOffset, imgWidth, imgHeight);
-          yOffset += maxContentHeight;
+        for (const section of topSections) {
+          if (section.offsetHeight < 10) continue; // skip invisible
+          const canvas = await html2canvas(section, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+            windowWidth: 1280,
+          });
+          const imgData = canvas.toDataURL("image/png");
+          addSectionToPDF(imgData, canvas.width, canvas.height);
         }
       }
 
