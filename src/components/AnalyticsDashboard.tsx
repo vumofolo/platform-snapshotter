@@ -378,8 +378,9 @@ export default function AnalyticsDashboard() {
     const A4_H = pdf.internal.pageSize.getHeight();
     const margin = 12;
     const contentW = A4_W - margin * 2;
-    const pageBottom = A4_H - margin - 8;
-    const sectionGap = 3;
+    const FOOTER_H = 10;
+    const usableH = A4_H - margin - FOOTER_H;
+    const sectionGap = 4;
     let currentY = margin;
 
     const tabLabels: Record<string, string> = {
@@ -416,20 +417,48 @@ export default function AnalyticsDashboard() {
       }
     };
 
+    const patchClonedDom = (clonedDoc: Document) => {
+      const style = clonedDoc.createElement("style");
+      style.innerHTML = `
+        * { animation: none !important; transition: none !important; }
+        body { background: #ffffff !important; color: #0f172a !important; }
+      `;
+      clonedDoc.head.appendChild(style);
+
+      clonedDoc.querySelectorAll("*").forEach((el) => {
+        const fs = parseFloat(window.getComputedStyle(el).fontSize);
+        if (fs > 0 && fs < 13) {
+          (el as HTMLElement).style.fontSize = "13px";
+        }
+      });
+
+      clonedDoc.querySelectorAll("svg text").forEach((el) => {
+        const t = el as SVGTextElement;
+        if (!t.style.fill || t.style.fill === "none") {
+          t.style.fill = "#334155";
+        }
+        const currentFs = parseFloat(t.style.fontSize || "12");
+        t.style.fontSize = Math.max(currentFs, 13) + "px";
+      });
+
+      clonedDoc.querySelectorAll(".recharts-surface, .recharts-wrapper").forEach((el) => {
+        (el as HTMLElement).style.overflow = "visible";
+      });
+
+      clonedDoc.querySelectorAll("header").forEach((el) => {
+        (el as HTMLElement).style.display = "none";
+      });
+    };
+
     const captureSection = async (section: HTMLElement) =>
       html2canvas(section, {
-        scale: 1.4,
+        scale: 2.5,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
-        windowWidth: 1280,
+        windowWidth: 900,
         onclone: (clonedDoc) => {
-          const style = clonedDoc.createElement("style");
-          style.innerHTML = `
-            * { animation: none !important; transition: none !important; }
-            body { background: #ffffff !important; color: #0f172a !important; }
-          `;
-          clonedDoc.head.appendChild(style);
+          patchClonedDom(clonedDoc);
         },
       });
 
@@ -446,14 +475,8 @@ export default function AnalyticsDashboard() {
       currentY += 12;
     };
 
-    const startTabPage = (label: string, continuation = false) => {
-      pdf.addPage();
-      currentY = margin;
-      drawTabHeader(label, continuation);
-    };
-
     const addSectionToPDF = (canvas: HTMLCanvasElement, label: string) => {
-      const maxSectionH = pageBottom - margin;
+      const maxSectionH = usableH - margin;
       let renderW = contentW;
       let renderH = (canvas.height * renderW) / canvas.width;
       let x = margin;
@@ -465,8 +488,11 @@ export default function AnalyticsDashboard() {
         x = margin + (contentW - renderW) / 2;
       }
 
-      if (currentY + renderH > pageBottom) {
-        startTabPage(label, true);
+      const remaining = usableH - currentY;
+      if (renderH > remaining && currentY > margin + (usableH - margin) * 0.4) {
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader(label, true);
       }
 
       const imgData = canvas.toDataURL("image/jpeg", 0.82);
@@ -475,21 +501,9 @@ export default function AnalyticsDashboard() {
     };
 
     const getTabSections = (tabContent: HTMLElement) => {
-      const sections: HTMLElement[] = [];
-      const directChildren = Array.from(tabContent.children).filter(
+      return Array.from(tabContent.children).filter(
         (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
       );
-
-      for (const child of directChildren) {
-        if (child.classList.contains("grid")) {
-          sections.push(child);
-          continue;
-        }
-
-        sections.push(child);
-      }
-
-      return sections;
     };
 
     const drawCoverPage = async () => {
@@ -532,9 +546,12 @@ export default function AnalyticsDashboard() {
     try {
       await drawCoverPage();
 
+      // KPI section — start on new page
       const kpiSection = dashboardRef.current.querySelector("section");
       if (kpiSection) {
-        startTabPage("Key Metrics");
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader("Key Metrics");
         const kpiCanvas = await captureSection(kpiSection as HTMLElement);
         addSectionToPDF(kpiCanvas, "Key Metrics");
       }
@@ -549,7 +566,15 @@ export default function AnalyticsDashboard() {
         if (!tabContent) continue;
 
         const label = tabLabels[tabKey] || tabKey;
-        startTabPage(label);
+
+        // Only start a new page if current page is >40% used
+        const remaining = usableH - currentY;
+        const usedFraction = (currentY - margin) / (usableH - margin);
+        if (usedFraction > 0.4) {
+          pdf.addPage();
+          currentY = margin;
+        }
+        drawTabHeader(label);
 
         const sections = getTabSections(tabContent);
         for (const section of sections) {
