@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, BarChart3, LayoutGrid, MessageCircle, Clock, MapPin, Globe, Timer, Loader2 } from "lucide-react";
+import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -366,295 +367,213 @@ export default function AnalyticsDashboard() {
 
   const allTabs = ["modules", "rankings", "roles", "enrol", "classes", "sessions", "engagement"];
 
-  const exportPDF = useCallback(() => {
-    if (exporting) return;
+  const exportPDF = useCallback(async () => {
+    if (!dashboardRef.current || exporting) return;
+
     setExporting(true);
+    const originalTab = tab;
 
-    try {
-      const pdf = new jsPDF("p", "mm", "a4");
-      const W = pdf.internal.pageSize.getWidth();
-      const H = pdf.internal.pageSize.getHeight();
-      const m = 14; // margin
-      const cw = W - m * 2; // content width
-      let y = m;
+    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
+    const A4_W = pdf.internal.pageSize.getWidth();
+    const A4_H = pdf.internal.pageSize.getHeight();
+    const margin = 12;
+    const contentW = A4_W - margin * 2;
+    const gap = 4;
+    let currentY = margin;
 
-      const checkPage = (need: number) => {
-        if (y + need > H - m) { pdf.addPage(); y = m; }
-      };
+    const tabLabels: Record<string, string> = {
+      modules: "Modules Overview",
+      rankings: "Module Rankings & Activity",
+      roles: "Roles & Access",
+      enrol: "Enrolment Analysis",
+      classes: "Classes & Completion",
+      sessions: "Sessions, Location & Devices",
+      engagement: "Engagement & Messaging",
+    };
 
-      const sectionTitle = (title: string) => {
-        checkPage(14);
-        pdf.setFillColor(15, 23, 42);
-        pdf.roundedRect(m, y, cw, 9, 2, 2, "F");
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor(255, 255, 255);
-        pdf.text(title, m + 4, y + 6.5);
-        pdf.setTextColor(30, 41, 59);
-        pdf.setFont("helvetica", "normal");
-        y += 13;
-      };
-
-      const drawTable = (headers: string[], rows: string[][], colWidths: number[]) => {
-        const rowH = 7;
-        const fontSize = 7.5;
-
-        // Header
-        checkPage(rowH * 2);
-        pdf.setFillColor(241, 245, 249);
-        pdf.rect(m, y, cw, rowH, "F");
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(fontSize);
-        let x = m + 2;
-        headers.forEach((h, i) => {
-          pdf.text(h, x, y + 5);
-          x += colWidths[i];
-        });
-        y += rowH;
-        pdf.setFont("helvetica", "normal");
-
-        // Rows
-        rows.forEach((row, ri) => {
-          checkPage(rowH);
-          if (ri % 2 === 1) {
-            pdf.setFillColor(248, 250, 252);
-            pdf.rect(m, y, cw, rowH, "F");
-          }
-          x = m + 2;
-          row.forEach((cell, ci) => {
-            const maxW = colWidths[ci] - 3;
-            const truncated = pdf.getStringUnitWidth(cell) * fontSize / pdf.internal.scaleFactor > maxW
-              ? cell.substring(0, Math.floor(maxW / 2)) + "…"
-              : cell;
-            pdf.text(truncated, x, y + 5);
-            x += colWidths[ci];
+    const waitForRender = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 500);
           });
-          y += rowH;
         });
-        y += 4;
-      };
+      });
 
-      const drawBar = (data: { label: string; value: number }[], title: string, barColor = [99, 102, 241]) => {
-        checkPage(55);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9);
-        pdf.text(title, m, y + 4);
-        y += 8;
-        const maxVal = Math.max(...data.map(d => d.value), 1);
-        const barH = 5;
-        const labelW = 45;
-        const barAreaW = cw - labelW - 15;
-        data.forEach(d => {
-          checkPage(barH + 2);
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(7);
-          const label = d.label.length > 25 ? d.label.substring(0, 24) + "…" : d.label;
-          pdf.text(label, m, y + 4);
-          const bw = (d.value / maxVal) * barAreaW;
-          pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
-          pdf.roundedRect(m + labelW, y, bw, barH, 1, 1, "F");
-          pdf.setFontSize(7);
-          pdf.text(String(d.value), m + labelW + bw + 2, y + 4);
-          y += barH + 2;
-        });
-        y += 4;
-      };
-
-      // ── COVER PAGE ──
+    const drawTabHeader = (label: string) => {
+      if (currentY + 14 > A4_H - margin) {
+        pdf.addPage();
+        currentY = margin;
+      }
       pdf.setFillColor(15, 23, 42);
-      pdf.rect(0, 0, W, H, "F");
+      pdf.roundedRect(margin, currentY, contentW, 10, 2, 2, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(label, margin + 4, currentY + 7);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont("helvetica", "normal");
+      currentY += 10 + gap;
+    };
+
+    const addSectionToPDF = (canvas: HTMLCanvasElement, forceNewPage = false) => {
+      const maxPageH = A4_H - margin * 2;
+      let renderW = contentW;
+      let renderH = (canvas.height * renderW) / canvas.width;
+      let x = margin;
+
+      if (renderH > maxPageH) {
+        const fitScale = maxPageH / renderH;
+        renderW *= fitScale;
+        renderH = maxPageH;
+        x = margin + (contentW - renderW) / 2;
+      }
+
+      if (forceNewPage && currentY > margin + 1) {
+        pdf.addPage();
+        currentY = margin;
+      }
+
+      if (currentY + renderH > A4_H - margin) {
+        pdf.addPage();
+        currentY = margin;
+      }
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.86);
+      pdf.addImage(imgData, "JPEG", x, currentY, renderW, renderH, undefined, "FAST");
+      currentY += renderH + gap;
+    };
+
+    const getTabSections = (tabContent: HTMLElement) => {
+      const sections: HTMLElement[] = [];
+      const directChildren = Array.from(tabContent.children).filter(
+        (el): el is HTMLElement => el instanceof HTMLElement
+      );
+
+      for (const child of directChildren) {
+        if (child.classList.contains("grid")) {
+          const nested = Array.from(child.children).filter(
+            (el): el is HTMLElement => el instanceof HTMLElement && el.offsetHeight > 10
+          );
+          if (nested.length) {
+            sections.push(...nested);
+            continue;
+          }
+        }
+        if (child.offsetHeight > 10) sections.push(child);
+      }
+
+      return sections;
+    };
+
+    const drawCoverPage = () => {
+      pdf.setFillColor(15, 23, 42);
+      pdf.rect(0, 0, A4_W, A4_H, "F");
       pdf.setFillColor(99, 102, 241);
-      pdf.rect(m, 100, 60, 3, "F");
+      pdf.rect(margin, 100, 60, 3, "F");
+
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(28);
-      pdf.text("Our Equity", m, 120);
+      pdf.text("Our Equity", margin, 120);
+
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(203, 213, 225);
-      pdf.text("Platform Snapshot Report", m, 132);
+      pdf.text("Platform Snapshot Report", margin, 132);
+
       pdf.setFontSize(10);
       pdf.setTextColor(148, 163, 184);
-      const dateStr = new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "long", day: "numeric" });
-      pdf.text(`Generated: ${dateStr}`, m, 148);
-      pdf.text("Confidential — For cohort & sponsors", m, 156);
-
-      // ── KEY METRICS ──
-      pdf.addPage();
-      y = m;
-      sectionTitle("Key Metrics");
-      const metricPairs = [
-        ["Active Modules", String(kpis.totalModules)],
-        ["Active Fellows", String(kpis.activeFellows)],
-        ["Total Enrolments", String(kpis.totalEnrolments)],
-        ["Total Platform Hours", String(kpis.totalHours) + "h"],
-        ["Peak Enrolment Month", kpis.peakMonth],
-        ["Unique Fellows", String(kpis.uniqueFellows)],
-      ];
-      pdf.setFontSize(9);
-      metricPairs.forEach(([label, val]) => {
-        checkPage(8);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(label + ":", m, y + 5);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(val, m + 50, y + 5);
-        y += 8;
+      const dateStr = new Date().toLocaleDateString("en-ZA", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
-      y += 4;
+      pdf.text(`Generated: ${dateStr}`, margin, 148);
+      pdf.text("Generated for cohort & sponsors", margin, 156);
+      pdf.setTextColor(0, 0, 0);
+    };
 
-      // ── MODULES ──
-      sectionTitle("Modules Overview");
-      drawTable(
-        ["#", "Title", "Registrations", "Status"],
-        modules.map(mod => [String(mod.moduleNumber), mod.title, String(mod.sales), mod.status]),
-        [10, 105, 30, 25]
-      );
+    try {
+      drawCoverPage();
 
-      // ── MODULE RANKINGS ──
-      sectionTitle("Module Rankings");
-      drawBar(
-        moduleRankings.map(r => ({ label: r.fullTitle, value: r.registrations })),
-        "Registrations by Module"
-      );
+      const kpiSection = dashboardRef.current.querySelector("section");
+      if (kpiSection) {
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader("Key Metrics");
 
-      // ── ROLES ──
-      sectionTitle("Roles & Access");
-      drawTable(
-        ["Role", "Users", "First Activated"],
-        roles.map(r => [r.title, String(r.users), r.firstActivated]),
-        [60, 30, 50]
-      );
+        const kpiCanvas = await html2canvas(kpiSection as HTMLElement, {
+          scale: 1.8,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          windowWidth: 1440,
+        });
+        addSectionToPDF(kpiCanvas, false);
+      }
 
-      // ── ENROLMENT ──
-      sectionTitle("Enrolment Analysis");
-      drawBar(
-        enrollmentsByMonth.map(e => ({ label: e.month, value: e.uniqueFellows })),
-        "Unique Fellows per Month",
-        [34, 197, 94]
-      );
-      drawBar(
-        registrationsPerMonth.map(e => ({ label: e.month, value: e.registrations })),
-        "Total Registrations per Month"
-      );
-      drawBar(
-        registrationsByTimeOfDay.map(e => ({ label: e.label, value: e.count })),
-        "Registrations by Time of Day",
-        [251, 146, 60]
-      );
-      drawBar(
-        registrationsByDay.map(e => ({ label: e.day, value: e.count })),
-        "Registrations by Day of Week",
-        [14, 165, 233]
-      );
+      for (const tabKey of allTabs) {
+        setTab(tabKey);
+        await waitForRender();
 
-      // ── FELLOWS PER MODULE ──
-      sectionTitle("Fellows — Modules Enrolled");
-      drawTable(
-        ["Fellow", "Modules Enrolled"],
-        modulesPerFellow.map(f => [f.fellow, String(f.modulesEnrolled)]),
-        [120, 40]
-      );
+        const tabContent = dashboardRef.current.querySelector(
+          '[role="tabpanel"][data-state="active"]'
+        ) as HTMLElement | null;
+        if (!tabContent) continue;
 
-      // ── CLASSES ──
-      sectionTitle("Classes per Fellow");
-      drawTable(
-        ["Fellow", "Classes"],
-        classesPerFellow.map(f => [f.name, String(f.classes)]),
-        [120, 40]
-      );
+        pdf.addPage();
+        currentY = margin;
+        drawTabHeader(tabLabels[tabKey] || tabKey);
 
-      // ── FELLOW STATUSES ──
-      sectionTitle("Fellow Statuses");
-      drawTable(
-        ["Fellow", "Status"],
-        fellowStatuses.map(f => [f.name, f.status]),
-        [120, 40]
-      );
+        const sections = getTabSections(tabContent);
 
-      // ── SESSIONS ──
-      sectionTitle("Sessions — Geographic Distribution");
-      drawTable(
-        ["Country", "Sessions", "Fellows"],
-        sessionsByCountry.map(s => [s.country, String(s.sessions), String(s.fellows)]),
-        [60, 40, 40]
-      );
-      drawTable(
-        ["City", "Country", "Sessions"],
-        sessionsByCity.map(s => [s.city, s.country, String(s.sessions)]),
-        [55, 50, 35]
-      );
+        for (const section of sections) {
+          const hasChart = !!section.querySelector(".recharts-responsive-container");
 
-      sectionTitle("Sessions — Devices & OS");
-      drawTable(
-        ["Device", "Sessions"],
-        sessionsByDevice.map(s => [s.device, String(s.sessions)]),
-        [80, 40]
-      );
-      drawTable(
-        ["OS", "Sessions"],
-        sessionsByOS.map(s => [s.os, String(s.sessions)]),
-        [80, 40]
-      );
+          const canvas = await html2canvas(section, {
+            scale: 1.8,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+            windowWidth: 1440,
+            onclone: (clonedDoc) => {
+              const style = clonedDoc.createElement("style");
+              style.innerHTML = `
+                * { animation: none !important; transition: none !important; }
+                body { background: #ffffff !important; color: #0f172a !important; }
+              `;
+              clonedDoc.head.appendChild(style);
+            },
+          });
 
-      sectionTitle("Sessions per Month");
-      drawBar(
-        sessionsPerMonth.map(s => ({ label: s.month, value: s.sessions })),
-        "Monthly Sessions",
-        [14, 165, 233]
-      );
+          // Graph sections are kept intact by starting them on a fresh page when needed.
+          addSectionToPDF(canvas, hasChart);
+        }
+      }
 
-      sectionTitle("Session Time of Day");
-      drawBar(
-        sessionsByTimeOfDay.map(s => ({ label: s.label, value: s.count })),
-        "Login Times",
-        [251, 146, 60]
-      );
-
-      // ── DURATION RANKING ──
-      sectionTitle("Duration Ranking");
-      drawTable(
-        ["Fellow", "Total Time", "Tier"],
-        durationPerFellow.map(d => [d.fellow, d.display, d.tier]),
-        [80, 40, 30]
-      );
-
-      // ── FELLOW ACTIVITY ──
-      sectionTitle("Fellow Activity Correlation");
-      drawTable(
-        ["Fellow", "Country", "City", "Sessions", "Peak", "Device"],
-        fellowActivity.map(f => [f.fellow, f.country, f.city, String(f.sessions), f.peakTime, f.device]),
-        [38, 28, 34, 18, 22, 22]
-      );
-
-      // ── ENGAGEMENT ──
-      sectionTitle("Engagement & Messaging");
-      drawTable(
-        ["Month", "Entries"],
-        engagementByMonth.map(e => [e.month, String(e.entries)]),
-        [80, 40]
-      );
-      drawTable(
-        ["Username", "Subject", "Status", "Created"],
-        messagePreview.map(m => [m.username, m.subject, m.status, m.created]),
-        [40, 45, 30, 40]
-      );
-
-      // ── FOOTERS ──
-      const pages = pdf.getNumberOfPages();
-      for (let p = 2; p <= pages; p++) {
+      const pageCount = pdf.getNumberOfPages();
+      for (let p = 2; p <= pageCount; p++) {
         pdf.setPage(p);
         pdf.setFontSize(7);
         pdf.setTextColor(148, 163, 184);
-        pdf.text(`Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pages - 1}`, W / 2, H - 5, { align: "center" });
+        pdf.text(
+          `Our Equity — Platform Snapshot  •  Page ${p - 1} of ${pageCount - 1}`,
+          A4_W / 2,
+          A4_H - 5,
+          { align: "center" }
+        );
       }
+      pdf.setTextColor(0, 0, 0);
 
       pdf.save("OurEquity_Dashboard_Report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
     } finally {
+      setTab(originalTab);
       setExporting(false);
     }
-  }, [exporting, kpis, moduleRankings]);
+  }, [tab, exporting, allTabs]);
 
   return <div ref={dashboardRef} className="min-h-screen bg-background">
     {/* Header */}
